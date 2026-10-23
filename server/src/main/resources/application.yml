@@ -1,0 +1,15 @@
+server:
+  port: 8090
+
+spring:
+  application:
+    name: momentlog-server
+  datasource:
+    # 초안: 파일 H2. 운영 DB는 팀에서 정한 뒤 바꾼다.
+    url: jdbc:h2:file:./data/momentlog;MODE=MySQL
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
