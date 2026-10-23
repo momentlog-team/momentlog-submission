@@ -16,4 +16,5 @@ keystore.properties
 
 # 서버 로컬 DB
 server/data/
+data/
 .kotlin/
