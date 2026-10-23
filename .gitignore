@@ -1,0 +1,19 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+
+# 서명 키와 비밀값은 올리지 않는다
+keystore/
+*.jks
+*.keystore
+keystore.properties
+
+# 서버 로컬 DB
+server/data/
+.kotlin/
