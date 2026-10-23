@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-feature android:name="android.hardware.type.automotive" android:required="true" />
+
+    <!-- Pleos Vehicle SDK 조회 권한 (제어 권한은 쓰지 않는다) -->
+    <uses-permission android:name="pleos.car.permission.CAR_DRIVE" />    <!-- 브레이크, 조향 -->
+    <uses-permission android:name="pleos.car.permission.CAR_LIGHTS" />   <!-- 방향지시등, 전조등 -->
+    <uses-permission android:name="pleos.car.permission.CAR_WINDOWS" />  <!-- 와이퍼 -->
+    <uses-permission android:name="pleos.car.permission.CAR_SAFETY" />   <!-- 에어백 전개 -->
+    <!-- 공식 샘플(pleos-sample-vehicle-app) 매니페스트에 함께 선언된 조회 권한 -->
+    <uses-permission android:name="pleos.car.permission.CAR_SPEED" />
+    <uses-permission android:name="pleos.car.permission.READ_CAR_STEERING" />
+    <uses-permission android:name="pleos.car.permission.READ_WINDSHIELD_WIPERS" />
+    <!-- Android Automotive 차량 속도 PERF_VEHICLE_SPEED (런타임 허용 필요) -->
+    <uses-permission android:name="android.car.permission.CAR_SPEED" />
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <application
+        android:allowBackup="false"
+        android:label="@string/app_name"
+        android:usesCleartextTraffic="true"
+        android:theme="@android:style/Theme.Material.NoActionBar">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <!-- 주행 중에도 화면을 띄울 수 있게 선언. 주행 중에는 CarUxRestrictions에 따라 조작을 줄인다(TODO). -->
+            <meta-data android:name="distractionOptimized" android:value="true" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- 화면이 가려져도 최근 30초 기록을 계속 들고 있는 서비스 -->
+        <service
+            android:name=".RecorderService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="incident_recording" />
+        </service>
+    </application>
+</manifest>
