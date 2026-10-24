@@ -18,3 +18,4 @@ keystore.properties
 server/data/
 data/
 .kotlin/
+planning/node_modules/

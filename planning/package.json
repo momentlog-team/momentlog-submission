@@ -1,0 +1,12 @@
+{
+  "name": "momentlog-planning",
+  "private": true,
+  "description": "공모전 공식 접수양식(template.docx)에 기획 내용을 채워 기획서를 만드는 도구",
+  "scripts": {
+    "build": "node build.js content/1_순간기록.js output/1_순간기록.docx && node build.js content/2_길눈.js output/2_길눈.docx"
+  },
+  "dependencies": {
+    "@xmldom/xmldom": "0.8.10",
+    "jszip": "3.10.1"
+  }
+}
