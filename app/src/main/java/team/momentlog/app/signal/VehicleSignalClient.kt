@@ -47,6 +47,7 @@ class VehicleSignalClient(context: Context) : SignalSource {
             val listener = object : BrakePedalStatusListener {
                 override fun onBrakePedalStatusUpdated(status: Boolean?) {
                     signals.brake = status
+                    received("브레이크", status)
                 }
                 override fun onFailed(e: Exception) = report("브레이크", e)
             }
@@ -58,6 +59,7 @@ class VehicleSignalClient(context: Context) : SignalSource {
             val listener = object : TurnSignalStateListener {
                 override fun onTurnSignalStateUpdated(state: TurnSignalValue?) {
                     signals.turn = toTurnSignal(state)
+                    received("방향지시등", state)
                 }
                 override fun onFailed(e: Exception) = report("방향지시등", e)
             }
@@ -69,6 +71,7 @@ class VehicleSignalClient(context: Context) : SignalSource {
             val listener = object : SteeringWheelAngleListener {
                 override fun onSteeringWheelAngleUpdated(angle: Float?) {
                     signals.steeringDeg = angle
+                    received("조향각", angle)
                 }
                 override fun onFailed(e: Exception) = report("조향각", e)
             }
@@ -93,6 +96,7 @@ class VehicleSignalClient(context: Context) : SignalSource {
             val listener = object : WiperStateListener {
                 override fun onWiperStateUpdated(state: WiperState?) {
                     signals.wiperOn = state?.let { it == WiperState.ON }
+                    received("와이퍼", state)
                 }
                 override fun onFailed(e: Exception) = report("와이퍼", e)
             }
@@ -104,6 +108,7 @@ class VehicleSignalClient(context: Context) : SignalSource {
             val driver = SeatArea(SeatValue.ROW_1_LEFT)
             val listener = object : SeatAirbagDeployedListener {
                 override fun onSeatAirbagDeployUpdated(deployed: Boolean?) {
+                    received("에어백", deployed)
                     if (deployed == true) onAirbagDeployed?.invoke()
                 }
                 override fun onFailed(e: Exception) = report("에어백", e)
@@ -147,7 +152,10 @@ class VehicleSignalClient(context: Context) : SignalSource {
     }
 
     private fun lightListener(name: String, onChange: (Boolean?) -> Unit) = object : LightStateListener {
-        override fun onLightStateUpdated(state: LightState?) = onChange(state?.let { it == LightState.ON })
+        override fun onLightStateUpdated(state: LightState?) {
+            received(name, state)
+            onChange(state?.let { it == LightState.ON })
+        }
         override fun onFailed(e: Exception) = report(name, e)
     }
 
@@ -164,6 +172,11 @@ class VehicleSignalClient(context: Context) : SignalSource {
         } catch (e: Exception) {
             report(name, e)
         }
+    }
+
+    /** 콜백이 실제로 오는지 확인하는 용도. `adb logcat -s Momentlog:D` */
+    private fun received(name: String, value: Any?) {
+        Log.d(TAG, "차량 신호 [$name] = $value")
     }
 
     private fun report(name: String, e: Exception) {

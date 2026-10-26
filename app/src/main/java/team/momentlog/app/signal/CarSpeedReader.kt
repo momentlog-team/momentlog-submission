@@ -26,6 +26,7 @@ class CarSpeedReader(context: Context) {
             val cb = object : CarPropertyManager.CarPropertyEventCallback {
                 override fun onChangeEvent(value: CarPropertyValue<*>) {
                     val metersPerSecond = value.value as? Float ?: return
+                    Log.d(TAG, "차량 속도 = $metersPerSecond m/s")
                     onSpeedKph(kotlin.math.abs(metersPerSecond) * 3.6f)
                 }
                 override fun onErrorEvent(propertyId: Int, areaId: Int) {
