@@ -10,7 +10,7 @@ import kotlin.math.abs
  * 판단이 애매하면 단정하지 않고 사실만 적는다. 값이 없으면 "정보 없음"으로 남긴다.
  */
 class IncidentNarrator(
-    /** 조향각에서 왼쪽이 음수인지. AAOS 관례는 true. Pleos 실측 후 확정한다. */
+    /** 조향각에서 왼쪽이 음수인지. [Snapshot]은 왼쪽 음수로 저장하므로 true. */
     private val steeringLeftIsNegative: Boolean = true,
     /** 이 각도보다 작으면 핸들은 정면으로 본다. */
     private val straightThresholdDeg: Float = 5f,

@@ -100,6 +100,13 @@ class IncidentFlowTest {
     }
 
     @Test
+    fun `조향각이 음수면 왼쪽으로 적는다`() {
+        val snaps = intersectionScenario().map { it.copy(steeringDeg = -120f) }
+        val lines = IncidentNarrator().narrate(IncidentRecord("n-4", Trigger.HARD_STOP, 40_000, snaps))
+        assertTrue(lines.any { it.contains("왼쪽으로 120°") }, lines.toString())
+    }
+
+    @Test
     fun `지시등을 안 켰으면 그렇게 적는다`() {
         val snaps = intersectionScenario().map { it.copy(turn = TurnSignal.OFF) }
         val lines = IncidentNarrator().narrate(IncidentRecord("n-2", Trigger.HARD_STOP, 40_000, snaps))

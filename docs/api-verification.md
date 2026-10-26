@@ -15,7 +15,7 @@
 |---|---|---|---|---|---|
 | 브레이크 | `Brake.registerBrakePedalStatus(BrakePedalStatusListener)` | `CAR_DRIVE` | `Boolean?` 밟음 여부 | Brake Pedal 0~100% | 세기는 없음 |
 | 방향지시등 | `TurnSignal.registerTurnSignalState(TurnSignalStateListener)` | `CAR_LIGHTS` | `TurnSignalValue? {OFF, RIGHT, LEFT}` | Turn Signal State | |
-| 조향각 | `SteeringWheel.registerSteeringWheelAngle(SteeringWheelAngleListener)` | `CAR_DRIVE` | `Float?` 도 | Steering Angle -470~500° | 콘솔 값과 부호가 반대로 들어온다(아래 실측). 왼쪽이 어느 부호인지는 미확정 |
+| 조향각 | `SteeringWheel.registerSteeringWheelAngle(SteeringWheelAngleListener)` | `CAR_DRIVE` | `Float?` 도 | Steering Angle -470~500° (음수가 왼쪽) | SDK 원값은 왼쪽이 양수. 앱이 받을 때 뒤집어 왼쪽 음수로 기록 |
 | 하향등 | `Light.registerLowBeamLightState(LightStateListener)` | `CAR_LIGHTS` | `LightState? {OFF, ON, DAYTIME_RUNNING}` | Exterior Lights Mode | |
 | 상향등 | `Light.registerHighBeamLightState(LightStateListener)` | `CAR_LIGHTS` | 위와 같음 | High Beam | |
 | 와이퍼 | `Wiper.registerWiperState(WindowArea, WiperStateListener)` | `CAR_WINDOWS` | `WiperState? {OTHER, OFF, ON, SERVICE}` | Windshield Wiper Switch | |
@@ -50,6 +50,6 @@
 
 ## 남은 확인 항목
 
-- 조향각 부호: 콘솔 주행 화면에서 핸들이 도는 방향을 보고 왼쪽이 음수인지 정한다. 정해지면 `IncidentNarrator(steeringLeftIsNegative)`를 맞춘다.
+- ~~조향각 부호~~: 콘솔 음수 = 왼쪽(사용자가 주행 화면으로 확인). SDK 원값은 왼쪽 양수 → `VehicleSignalClient`에서 뒤집어 저장.
 - 에어백: 콘솔에 항목이 없어 확인 불가. 시연은 급정지 감지로 한다.
 - 음성 입력(마이크) 사용 가능 여부

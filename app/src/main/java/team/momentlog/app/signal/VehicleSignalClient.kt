@@ -70,7 +70,8 @@ class VehicleSignalClient(context: Context) : SignalSource {
         subscribe("조향각") {
             val listener = object : SteeringWheelAngleListener {
                 override fun onSteeringWheelAngleUpdated(angle: Float?) {
-                    signals.steeringDeg = angle
+                    // Pleos SDK는 왼쪽이 양수로 온다(10/26 Virtual Console 실측). 기록은 왼쪽 음수로 맞춘다.
+                    signals.steeringDeg = angle?.let { -it }
                     received("조향각", angle)
                 }
                 override fun onFailed(e: Exception) = report("조향각", e)

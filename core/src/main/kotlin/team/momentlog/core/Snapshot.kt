@@ -7,8 +7,7 @@ enum class TurnSignal { OFF, LEFT, RIGHT }
  * 한 시점의 내 차 상태.
  * 차종이 지원하지 않거나 아직 값을 못 받은 항목은 null로 둔다(문서에 "기록 없음"으로 표시).
  *
- * 조향각 부호는 AAOS 관례(왼쪽이 음수)를 따른다. Pleos 실측으로 부호를 확인하기 전까지는
- * [IncidentNarrator]가 방향을 단정하지 않도록 [steeringLeftIsNegative] 설정으로 뒤집을 수 있게 둔다.
+ * 조향각 부호는 왼쪽이 음수다. Pleos SDK 원값은 왼쪽이 양수라서(에뮬레이터 실측) 앱이 받을 때 뒤집어 넣는다.
  */
 data class Snapshot(
     val atMillis: Long,
