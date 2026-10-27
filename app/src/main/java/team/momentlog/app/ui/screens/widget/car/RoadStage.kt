@@ -73,18 +73,21 @@ fun RoadStage(
     modifier: Modifier = Modifier,
     lamps: CarLamps = CarLamps(),
     dim: Boolean = false,
+    arrivalProgress: Float? = null,
     behindCar: @Composable BoxScope.(RoadGeometry) -> Unit = {},
     overCar: @Composable BoxScope.(RoadGeometry) -> Unit = {},
 ) {
     val colors = LocalAppColors.current
     val g = roadGeometry
     val stageAlpha by animateFloatAsState(if (dim) 0.45f else 1f, tween(420, easing = EaseOut), label = "dim")
+    val arrived = arrivalProgress == null || arrivalProgress >= 0.999f
 
     Box(modifier.width(g.stageWidth.q).fillMaxHeight().alpha(stageAlpha)) {
         Box(Modifier.offset(g.roadX.q).width(g.roadWidth.q).fillMaxHeight().background(colors.road))
         Box(Modifier.offset(g.edgeLeftX.q).width(4.q).fillMaxHeight().background(colors.roadMark))
         Box(Modifier.offset(g.edgeRightX.q).width(4.q).fillMaxHeight().background(colors.roadMark))
         val dash = 56.q
+        val roadTravel = 420.q
         Canvas(Modifier.offset(g.laneX.q).width(4.q).fillMaxHeight()) {
             val on = dash.toPx()
             drawLine(
@@ -92,7 +95,10 @@ fun RoadStage(
                 Offset(size.width / 2, 0f),
                 Offset(size.width / 2, size.height),
                 strokeWidth = size.width,
-                pathEffect = PathEffect.dashPathEffect(floatArrayOf(on, on)),
+                pathEffect = PathEffect.dashPathEffect(
+                    floatArrayOf(on, on),
+                    phase = -((arrivalProgress ?: 0f) * roadTravel.toPx()),
+                ),
             )
         }
 
@@ -100,14 +106,14 @@ fun RoadStage(
 
         CarDrawing(
             Modifier
-                .offset(g.carX.q, g.carY.q)
+                .offset(g.carX.q, (g.carY + (1f - (arrivalProgress ?: 1f)) * (1180 - g.carY)).q)
                 .size(g.carWidth.q, g.carHeight.q)
-                .enterFromBelow(48.q),
-            lamps,
+                .then(if (arrivalProgress == null) Modifier.enterFromBelow(48.q) else Modifier),
+            if (arrivalProgress != null && arrivalProgress in 0.72f..0.998f) lamps.copy(brake = true) else lamps,
         )
 
-        val parkScale by animateFloatAsState(if (parked) 1f else 0.6f, tween(420, easing = EaseOut), label = "p")
-        val parkAlpha by animateFloatAsState(if (parked) 1f else 0f, tween(300, easing = EaseOut), label = "pAlpha")
+        val parkScale by animateFloatAsState(if (parked && arrived) 1f else 0.6f, tween(420, easing = EaseOut), label = "p")
+        val parkAlpha by animateFloatAsState(if (parked && arrived) 1f else 0f, tween(300, easing = EaseOut), label = "pAlpha")
         Box(
             Modifier
                 .offset(g.parkX.q, g.parkY.q)

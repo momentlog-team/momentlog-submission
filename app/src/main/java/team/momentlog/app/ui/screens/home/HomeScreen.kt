@@ -1,5 +1,8 @@
 package team.momentlog.app.ui.screens.home
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,14 +23,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import kotlinx.coroutines.delay
 import team.momentlog.app.config.theme.LocalAppColors
 import team.momentlog.app.config.theme.isSplit
 import team.momentlog.app.config.theme.q
@@ -62,14 +69,21 @@ fun HomeScreen(mainViewModel: MainViewModel, onOpenRecords: () -> Unit) {
 private fun HomeContent(parked: Boolean, unsupported: List<String>, onRecordNow: () -> Unit, onOpenRecords: () -> Unit) {
     val colors = LocalAppColors.current
     val split = isSplit
+    val arrival = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        arrival.animateTo(1f, tween(1800, easing = CubicBezierEasing(0.18f, 0.55f, 0.25f, 1f)))
+    }
     AppScreen(drivingAllowed = !parked) {
         RoadStage(
             parked = parked,
+            arrivalProgress = arrival.value,
             behindCar = { g ->
-                TrailBehindCar(g)
-                TrailLabel(split)
+                if (arrival.value >= 0.999f) {
+                    TrailBehindCar(g)
+                    TrailLabel(split)
+                }
             },
-            overCar = { if (!split) SignalCallouts(unsupported) },
+            overCar = { if (!split) SignalCallouts(unsupported, ready = arrival.value >= 0.999f) },
         )
 
         val copyModifier = if (split) {
@@ -146,34 +160,47 @@ private fun BoxScope.TrailLabel(split: Boolean) {
 
 /** 차 그림의 램프·바퀴에서 신호 이름으로 이어지는 라벨. */
 @Composable
-private fun BoxScope.SignalCallouts(unsupported: List<String>) {
+private fun BoxScope.SignalCallouts(unsupported: List<String>, ready: Boolean) {
     val colors = LocalAppColors.current
     val unit = 1.q
+    val reveals = remember { List(4) { Animatable(0f) } }
+    LaunchedEffect(ready) {
+        if (!ready) {
+            reveals.forEach { it.snapTo(0f) }
+        } else {
+            delay(120)
+            reveals.forEach {
+                it.animateTo(1f, tween(300))
+                delay(80)
+            }
+        }
+    }
     Canvas(Modifier.fillMaxSize()) {
         val u = unit.toPx()
         listOf(
             Offset(459f, 236f) to 590f, Offset(423f, 597f) to 590f,
             Offset(302f, 290f) to 200f, Offset(306f, 420f) to 200f,
-        ).forEach { (from, toX) ->
-            drawLine(colors.textTertiary, Offset(from.x * u, from.y * u), Offset(toX * u, from.y * u), 2 * u)
-            drawCircle(colors.textPrimary, 6 * u, Offset(from.x * u, from.y * u))
+        ).forEachIndexed { index, (from, toX) ->
+            val progress = reveals[index].value
+            drawLine(colors.textTertiary.copy(alpha = progress), Offset(from.x * u, from.y * u), Offset((from.x + (toX - from.x) * progress) * u, from.y * u), 2 * u)
+            drawCircle(colors.textPrimary.copy(alpha = progress), 6 * u, Offset(from.x * u, from.y * u))
         }
     }
-    Callout("방향지시등", null, "방향지시등" in unsupported, left = 604.q, top = 218.q)
-    Callout("브레이크", null, "브레이크" in unsupported, left = 604.q, top = 579.q)
+    Callout("방향지시등", null, "방향지시등" in unsupported, left = 604.q, top = 218.q, reveal = reveals[0].value)
+    Callout("브레이크", null, "브레이크" in unsupported, left = 604.q, top = 579.q, reveal = reveals[1].value)
     val steerOff = "조향각" in unsupported
-    Callout("조향각", if (steerOff) "기록 불가" else null, steerOff, rightEdge = 188.q, top = if (steerOff) 256.q else 272.q)
+    Callout("조향각", if (steerOff) "기록 불가" else null, steerOff, rightEdge = 188.q, top = if (steerOff) 256.q else 272.q, reveal = reveals[2].value)
     val speedOff = "속도" in unsupported
-    Callout("속도", if (speedOff) "기록 불가" else "위치·진행 방향", speedOff, rightEdge = 188.q, top = 388.q)
+    Callout("속도", if (speedOff) "기록 불가" else "위치·진행 방향", speedOff, rightEdge = 188.q, top = 388.q, reveal = reveals[3].value)
 }
 
 @Composable
-private fun Callout(name: String, sub: String?, off: Boolean, top: Dp, left: Dp? = null, rightEdge: Dp? = null) {
+private fun Callout(name: String, sub: String?, off: Boolean, top: Dp, left: Dp? = null, rightEdge: Dp? = null, reveal: Float = 1f) {
     val colors = LocalAppColors.current
     val align = if (left != null) TextAlign.Start else TextAlign.End
     val width = 180.q
     Column(
-        Modifier.offset(x = left ?: (rightEdge!! - width), y = top).width(width),
+        Modifier.offset(x = left ?: (rightEdge!! - width), y = top + (10f * (1f - reveal)).q).width(width).alpha(((reveal - 0.3f) / 0.7f).coerceIn(0f, 1f)),
         horizontalAlignment = if (left != null) Alignment.Start else Alignment.End,
     ) {
         Text(name, style = textStyle(24, 36, FontWeight.SemiBold, if (off) colors.textTertiary else colors.textPrimary), textAlign = align)
@@ -186,9 +213,9 @@ private fun Callout(name: String, sub: String?, off: Boolean, top: Dp, left: Dp?
 private fun SignalList(unsupported: List<String>) {
     val colors = LocalAppColors.current
     Column(Modifier.padding(top = 32.q), verticalArrangement = Arrangement.spacedBy(14.q)) {
-        listOf("속도", "브레이크", "방향지시등", "조향각").forEach { name ->
+        listOf("방향지시등", "브레이크", "조향각", "속도").forEachIndexed { index, name ->
             val off = name in unsupported
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.enterFromBelow(10.q, delayMillis = 1920 + index * 380), verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     Modifier
                         .size(12.q)
