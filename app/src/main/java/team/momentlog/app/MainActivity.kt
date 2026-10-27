@@ -1,10 +1,12 @@
 package team.momentlog.app
 
 import android.Manifest
+import android.app.ActivityManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.core.graphics.drawable.toBitmap
 import team.momentlog.app.config.AppViewModels
 import team.momentlog.app.ui.MomentlogApp
 import team.momentlog.app.ui.screens.use_case.DocumentViewModel
@@ -22,6 +24,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 차량 독에서도 런처와 같은 아이콘을 쓰도록 실행 작업에 직접 지정한다.
+        @Suppress("DEPRECATION")
+        setTaskDescription(
+            ActivityManager.TaskDescription(
+                getString(R.string.app_name),
+                requireNotNull(getDrawable(R.mipmap.ic_launcher)).toBitmap(192, 192),
+            ),
+        )
         requestPermissions(
             arrayOf("android.car.permission.CAR_SPEED", Manifest.permission.POST_NOTIFICATIONS),
             0,

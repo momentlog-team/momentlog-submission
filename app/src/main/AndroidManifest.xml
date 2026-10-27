@@ -32,6 +32,7 @@
 
         <activity
             android:name=".MainActivity"
+            android:icon="@mipmap/ic_launcher"
             android:exported="true">
             <!-- 주행 중에도 화면을 띄울 수 있게 선언. 주행 중에는 CarUxRestrictions에 따라 조작을 줄인다(TODO). -->
             <meta-data android:name="distractionOptimized" android:value="true" />
