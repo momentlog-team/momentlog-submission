@@ -3,6 +3,8 @@ package team.momentlog.app.record
 import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
+import team.momentlog.app.Constant
+import team.momentlog.core.IncidentEvent
 import team.momentlog.core.IncidentRecord
 import team.momentlog.core.Snapshot
 import team.momentlog.core.Trigger
@@ -11,41 +13,96 @@ import java.io.File
 
 /**
  * 기록을 차 안(앱 내부 저장소)에 JSON으로 둔다. 위치·조작 내역은 서버로 보내지 않는다.
- * TODO(앱): 사고가 아닌 저장 건 7일 뒤 자동 삭제, 사용자가 보관을 선택한 건 유지.
+ *
+ * 에어백(충격)이 감지됐거나 진술을 남긴 기록, 사용자가 보관을 고른 기록은 남긴다.
+ * 나머지는 저장 후 [Constant.RETENTION_DAYS]일 뒤 [purgeExpired]가 지운다.
+ * 진술은 센서 기록(snapshots)과 다른 필드에 두어, 해시(원본 지문) 대상에 섞이지 않게 한다.
  */
 class RecordStore(context: Context) {
     private val dir = File(context.filesDir, "records").apply { mkdirs() }
 
-    fun save(record: IncidentRecord, sha256: String) {
+    fun save(record: IncidentRecord, sha256: String, savedWhileParked: Boolean = false) {
         val json = JSONObject()
             .put("id", record.id)
             .put("trigger", record.trigger.name)
             .put("triggerAt", record.triggerAtMillis)
             .put("sha256", sha256)
             .put("sealed", false)
+            .put("parked", savedWhileParked)
+            .put("events", JSONArray().apply { record.events.forEach { put(JSONObject().put("trigger", it.trigger.name).put("t", it.atMillis)) } })
+            .put("merged", JSONArray(record.mergedRecordIds))
             .put("snapshots", JSONArray().apply { record.snapshots.forEach { put(it.toJson()) } })
         File(dir, "${record.id}.json").writeText(json.toString())
     }
 
-    fun markSealed(id: String) {
+    fun markSealed(id: String) = update(id) { put("sealed", true) }
+
+    fun saveStatement(id: String, text: String, plate: String?, state: StatementState) = update(id) {
+        put("statement", text)
+        put("plate", plate ?: JSONObject.NULL)
+        put("statementState", state.name)
+    }
+
+    fun retain(id: String) = update(id) { put("retained", true) }
+
+    /** 다른 기록에 합쳐진 앞선 기록을 지운다. 합친 기록이 그 구간과 감지를 그대로 담고 있다. */
+    fun delete(ids: List<String>) = ids.forEach { File(dir, "$it.json").delete() }
+
+    /** 보관 대상이 아닌데 보관 기간이 지난 기록을 지운다. */
+    fun purgeExpired(nowMillis: Long) {
+        dir.listFiles { f -> f.extension == "json" }.orEmpty().forEach { file ->
+            val saved = load(JSONObject(file.readText()))
+            if (!saved.isKept && nowMillis >= saved.deleteAtMillis) file.delete()
+        }
+    }
+
+    private fun update(id: String, change: JSONObject.() -> Unit) {
         val file = File(dir, "$id.json")
         if (!file.exists()) return
-        file.writeText(JSONObject(file.readText()).put("sealed", true).toString())
+        file.writeText(JSONObject(file.readText()).apply(change).toString())
     }
 
     fun list(): List<Saved> = dir.listFiles { f -> f.extension == "json" }.orEmpty()
         .map { load(JSONObject(it.readText())) }
         .sortedByDescending { it.record.triggerAtMillis }
 
-    data class Saved(val record: IncidentRecord, val sha256: String, val sealed: Boolean)
+    enum class StatementState { NONE, LATER, WRITING, DONE }
+
+    data class Saved(
+        val record: IncidentRecord,
+        val sha256: String,
+        val sealed: Boolean,
+        val savedWhileParked: Boolean = false,
+        val statement: String? = null,
+        val plate: String? = null,
+        val statementState: StatementState = StatementState.NONE,
+        val retained: Boolean = false,
+    ) {
+        /** 자동 보관 또는 사용자가 보관한 기록. */
+        val isKept: Boolean
+            get() = retained || record.trigger == Trigger.AIRBAG || statementState == StatementState.DONE
+
+        val deleteAtMillis: Long get() = record.triggerAtMillis + Constant.RETENTION_DAYS * 24 * 60 * 60 * 1000L
+    }
 
     private fun load(o: JSONObject): Saved {
         val arr = o.getJSONArray("snapshots")
         val snaps = (0 until arr.length()).map { arr.getJSONObject(it).toSnapshot() }
+        val trigger = Trigger.valueOf(o.getString("trigger"))
+        val triggerAt = o.getLong("triggerAt")
+        val events = o.optJSONArray("events")?.let { e ->
+            (0 until e.length()).map { e.getJSONObject(it).let { j -> IncidentEvent(Trigger.valueOf(j.getString("trigger")), j.getLong("t")) } }
+        } ?: listOf(IncidentEvent(trigger, triggerAt))
+        val merged = o.optJSONArray("merged")?.let { m -> (0 until m.length()).map { m.getString(it) } }.orEmpty()
         return Saved(
-            record = IncidentRecord(o.getString("id"), Trigger.valueOf(o.getString("trigger")), o.getLong("triggerAt"), snaps),
+            record = IncidentRecord(o.getString("id"), trigger, triggerAt, snaps, events, merged),
             sha256 = o.getString("sha256"),
             sealed = o.optBoolean("sealed", false),
+            savedWhileParked = o.optBoolean("parked", false),
+            statement = o.optNullable("statement") { getString(it) },
+            plate = o.optNullable("plate") { getString(it) },
+            statementState = o.optNullable("statementState") { StatementState.valueOf(getString(it)) } ?: StatementState.NONE,
+            retained = o.optBoolean("retained", false),
         )
     }
 
