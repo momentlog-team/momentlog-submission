@@ -42,29 +42,30 @@ fun CustomButton(
     primary: Boolean = false,
     large: Boolean = true,
     icon: AppIcon? = null,
+    compact: Boolean = false,
 ) {
     val colors = LocalAppColors.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(if (pressed) 0.95f else 1f, tween(120, easing = EaseOut), label = "press")
-    val shape = RoundedCornerShape(20.q)
+    val shape = RoundedCornerShape((if (compact) 18 else 20).q)
     val content = if (primary) Color.White else colors.textPrimary
 
     Row(
         modifier
             .scale(scale)
-            .height(if (large) 100.q else 80.q)
+            .height((if (compact) 80 else if (large) 100 else 80).q)
             .shadow(if (primary) 6.q else 3.q, shape, ambientColor = Color(0x2910151B), spotColor = Color(0x2910151B))
             .background(if (primary) colors.accent else colors.surface, shape)
             .clickable(interaction, indication = null, onClick = onClick)
-            .padding(horizontal = if (large) 52.q else 40.q),
+            .padding(horizontal = (if (compact) 32 else if (large) 52 else 40).q),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
         if (icon != null) {
-            Icon(icon, 36.q, content)
-            Spacer(Modifier.width(14.q))
+            Icon(icon, (if (compact) 30 else 36).q, content)
+            Spacer(Modifier.width((if (compact) 10 else 14).q))
         }
-        Text(text, style = textStyle(30, 30, FontWeight.Bold, content), textAlign = TextAlign.Center, maxLines = 1)
+        Text(text, style = textStyle(if (compact) 26 else 30, 30, FontWeight.Bold, content), textAlign = TextAlign.Center, maxLines = 1)
     }
 }

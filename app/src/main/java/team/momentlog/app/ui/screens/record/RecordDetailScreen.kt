@@ -103,18 +103,18 @@ private fun BoxScope.ResultFull(record: RecordInfo, onSendToPhone: () -> Unit, o
     ) {
         StatusChip(chipText(record), tone, icon = record.kind.icon)
         Spacer(Modifier.weight(1f))
-        CustomButton("휴대폰으로 받기", onSendToPhone, primary = true, large = false, icon = AppIcon.QR)
+        CustomButton("휴대폰으로 받기", onSendToPhone, primary = true, large = false, icon = AppIcon.QR, compact = true)
         Spacer(Modifier.width(16.q))
-        CustomButton("기록 목록", onOpenRecords, large = false, icon = AppIcon.LIST)
+        CustomButton("기록 목록", onOpenRecords, large = false, icon = AppIcon.LIST, compact = true)
     }
 
-    Column(Modifier.padding(start = 580.q, end = 56.q, top = 128.q)) {
-        Text(headline(record, colors), style = textStyle(60, 76, FontWeight.ExtraBold), maxLines = 2)
+    Column(Modifier.padding(start = 580.q, end = 56.q, top = 164.q)) {
+        Text(headline(record, colors), style = textStyle(52, 68, FontWeight.ExtraBold), maxLines = 2)
         Spacer(Modifier.height(16.q))
-        Text(subline(record), style = textStyle(30, 40, color = colors.textSecondary), maxLines = 1)
+        Text(subline(record), style = textStyle(28, 38, color = colors.textSecondary), maxLines = 1)
     }
 
-    StepTimeline(steps(record, colors), Modifier.padding(start = 580.q, end = 56.q, top = 370.q))
+    StepTimeline(steps(record, colors), Modifier.padding(start = 580.q, end = 56.q, top = 400.q))
 
     TimelineGraph(
         record.snapshots, record.triggeredAtMillis, markers(record, colors),
@@ -142,10 +142,10 @@ private fun ResultSplit(record: RecordInfo, onSendToPhone: () -> Unit, onStateme
         Row(Modifier.fillMaxWidth().padding(start = 40.q, end = 40.q, top = 24.q), verticalAlignment = Alignment.CenterVertically) {
             StatusChip(chipText(record), tone, icon = record.kind.icon)
             Spacer(Modifier.weight(1f))
-            CustomButton("받기", onSendToPhone, primary = true, large = false, icon = AppIcon.QR)
+            CustomButton("받기", onSendToPhone, primary = true, large = false, icon = AppIcon.QR, compact = true)
         }
-        Column(Modifier.padding(start = 40.q, end = 40.q, top = 116.q)) {
-            Text(headline(record, colors), style = textStyle(48, 62, FontWeight.ExtraBold), maxLines = 2)
+        Column(Modifier.padding(start = 40.q, end = 40.q, top = 144.q)) {
+            Text(headline(record, colors), style = textStyle(44, 58, FontWeight.ExtraBold), maxLines = 2)
         }
         MomentCar(record, Modifier.offset(70.q, 346.q).size(155.q, 311.q))
         StepTimeline(steps(record, colors), Modifier.padding(start = 320.q, end = 40.q, top = 352.q), compact = true)
