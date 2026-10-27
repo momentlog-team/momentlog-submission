@@ -17,7 +17,7 @@ team/momentlog/app/
 ├─ record/                   # RecordStore(차 안 JSON 저장), SealClient(서비스용 봉인 호출)
 ├─ config/
 │  ├─ AppNavigation.kt       # 경로(Routes)와 NavHost
-│  └─ theme/                 # Colors.kt(colorXXXXXX), Theme.kt
+│  └─ theme/                 # Colors.kt(colorXXXXXX), Theme.kt(낮/밤 토큰, QHD 크기 환산 .q/.qs)
 ├─ core/
 │  ├─ data/api/              # Retrofit 인터페이스, ApiInfo(서버 주소·클라이언트)
 │  ├─ data/model/            # 요청·응답 DTO
@@ -25,18 +25,27 @@ team/momentlog/app/
 │  ├─ error/                 # Failure, Either, ErrorUtil
 │  └─ vehicle/               # DrivingStateMonitor(주행 중 판단)
 └─ ui/
-   ├─ MomentlogApp.kt        # 공통 틀 + 화면 이동, 주행 시작 시 홈으로
-   ├─ common/                # AppScaffold(상단 바·왼쪽 레일), CustomButton
-   ├─ models/                # 화면용 모델(RecordInfo)
+   ├─ MomentlogApp.kt        # 테마 + 화면 이동, 저장 알림·출발 안내 덮기, 주행 재개 시 대기 화면으로
+   ├─ common/                # CustomButton
+   ├─ models/                # 화면용 모델(RecordInfo, RecordKind, RecordFacts, Formats)
    └─ screens/
       ├─ use_case/           # ViewModel (BaseViewModel, Main, Record, Statement, Document)
-      ├─ home/               # 1 홈
-      ├─ capture/            # 2 순간 저장 오버레이
-      ├─ statement/          # 3 정차 후 음성 진술
-      ├─ record/             # 4 기록 상세, 6 기록 목록
-      ├─ document/           # 5 문서 받기
-      ├─ settings/           # 설정
-      └─ widget/             # 화면 안 부품 (record/TimelineGraph)
+      ├─ home/               # 대기
+      ├─ capture/            # 저장 알림
+      ├─ statement/          # 정차 후 음성 진술
+      ├─ record/             # 결과 화면, 기록 목록
+      ├─ document/           # 휴대폰으로 받기(QR)
+      ├─ resume/             # 출발 안내
+      ├─ monthly/            # 월간 점검·구독 안내
+      ├─ settings/           # 설정(개발·시연용)
+      └─ widget/             # 여러 화면이 같이 쓰는 부품
+         ├─ car/             # CarDrawing(위에서 본 차), RoadStage(도로·차·P)
+         ├─ record/          # TimelineGraph(4줄 그래프), StepTimeline(경위 단계)
+         ├─ label/           # StatusChip, DriveFlag, VoiceHint, InfoNote, PlateBadge
+         ├─ layout/          # AppScreen(바탕·구석 표기), SidePanel
+         ├─ icon/            # AppIcon(선 아이콘)
+         ├─ motion/          # EaseOut, enterFromBelow
+         └─ qr/              # QrCode
 ```
 
 ## 규칙
@@ -44,8 +53,10 @@ team/momentlog/app/
 - ViewModel은 상태를 StateFlow로 내보내고, 화면은 `collectAsState()`로 받는다.
 - 화면은 ViewModel만 부른다. ViewModel은 Repository만 부른다(RecordStore·Api 직접 호출 금지).
 - 서버 호출 결과는 `Either<Failure, T>`로 돌려준다.
-- 색은 `Colors.kt`의 상수만 쓴다. 빨강 = 기록·충돌, 노랑 = 방향지시등·주행 중, 초록 = 정상·봉인, 파랑 = 주요 버튼.
-- 주행 중에는 홈만 보인다. 새 화면을 만들면 주행 중에 열리지 않게 한다.
+- 색은 `LocalAppColors.current`(낮/밤 토큰)로 읽는다. 값은 `Colors.kt`에 두고 화면에서 직접 쓰지 않는다. 빨강(danger)은 충격 감지와 위변조에만.
+- 크기는 QHD 앱 창 픽셀 값으로 `.q`(dp), `.qs`(sp)를 붙여 적는다. 실제 창 크기에 맞춰 비율로 바뀐다.
+- 두 화면 이상이 쓰는 부품은 `screens/widget/` 아래 종류별 패키지에 둔다.
+- 주행 중에는 대기 화면과 저장 알림만 보인다. 새 화면을 만들면 주행 재개 시 닫히게 한다(`MomentlogApp`).
 - 할 일은 코드에 `TODO(앱)`으로 남긴다.
 
 ## 사용한 오픈소스
@@ -54,6 +65,7 @@ team/momentlog/app/
 |---|---|---|
 | [Retrofit](https://github.com/square/retrofit) | 서버 통신 | Apache 2.0 |
 | [OkHttp](https://github.com/square/okhttp) | HTTP 클라이언트, 요청 로그 | Apache 2.0 |
+| [ZXing core](https://github.com/zxing/zxing) | QR 그리기 | Apache 2.0 |
 | [AndroidX](https://developer.android.com/jetpack/androidx) (Compose, Navigation, Lifecycle) | 화면, 화면 이동, ViewModel | Apache 2.0 |
 
 ## 빌드
