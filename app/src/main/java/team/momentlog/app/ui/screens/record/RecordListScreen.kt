@@ -22,7 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.foundation.shape.CircleShape
@@ -127,14 +127,18 @@ fun RecordListScreen(
             if (records.isEmpty()) {
                 EmptyRecords(Modifier.fillMaxSize())
             } else {
-                LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(8.q)) {
-                    itemsIndexed(records, key = { _, r -> r.id }) { index, record ->
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.weight(1f).enterFromBelow(8.q, durationMillis = 320),
+                    verticalArrangement = Arrangement.spacedBy(8.q),
+                ) {
+                    items(records, key = { it.id }, contentType = { "record" }) { record ->
                         RecordRow(
                             record, now,
                             selected = record.id == selected?.id,
                             stackChips = split,
                             onClick = { recordViewModel.focusRecord(record.id); if (split) onOpen(record) },
-                            modifier = Modifier.enterFromBelow(12.q, delayMillis = index * 50),
+                            modifier = Modifier,
                         )
                     }
                 }
