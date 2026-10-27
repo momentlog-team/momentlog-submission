@@ -1,0 +1,21 @@
+{
+  "packageName": "team.momentlog.app",
+  "appDescription": "Momentlog preserves recent vehicle signals and driver statements for reviewing driving incidents.",
+  "invokeWord": "순간기록",
+  "version": "0.1.0",
+  "actionCalls": [
+    {
+      "type": "function",
+      "function": {
+        "name": "SAVE_RECENT_DRIVE",
+        "description": "Request capture of the available recent vehicle signals and subsequent driving interval for an incident record.",
+        "component": "service",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      }
+    }
+  ]
+}
