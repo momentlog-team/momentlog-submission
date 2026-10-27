@@ -13,6 +13,7 @@ import team.momentlog.app.config.theme.q
 import team.momentlog.app.config.theme.textStyle
 import team.momentlog.app.ui.common.CustomButton
 import team.momentlog.app.ui.screens.use_case.MainViewModel
+import team.momentlog.app.ui.screens.widget.icon.AppIcon
 import team.momentlog.app.ui.screens.widget.layout.AppScreen
 
 /**
@@ -20,9 +21,10 @@ import team.momentlog.app.ui.screens.widget.layout.AppScreen
  * TODO(앱): 감지 민감도, 보관 기간, 정차 후 질문 켜기/끄기, 신호별 지원 여부(check*Capabilities 결과)
  */
 @Composable
-fun SettingsScreen(mainViewModel: MainViewModel) {
+fun SettingsScreen(mainViewModel: MainViewModel, onBack: () -> Unit) {
     AppScreen(drivingAllowed = false) {
         Column(Modifier.padding(56.q), verticalArrangement = Arrangement.spacedBy(32.q)) {
+            CustomButton("뒤로", onClick = onBack, large = false, icon = AppIcon.BACK)
             Text("설정", style = textStyle(40, 48, FontWeight.ExtraBold))
             Text("기록 제어 (개발·시연용)", style = textStyle(30, 42, color = LocalAppColors.current.textSecondary))
             Row(horizontalArrangement = Arrangement.spacedBy(16.q)) {

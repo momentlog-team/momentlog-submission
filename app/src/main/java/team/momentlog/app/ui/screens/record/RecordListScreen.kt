@@ -35,6 +35,9 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -76,6 +79,7 @@ fun RecordListScreen(
     onStatement: (RecordInfo) -> Unit,
     onSendToPhone: (RecordInfo) -> Unit,
     onSettings: () -> Unit,
+    onHome: () -> Unit,
 ) {
     LaunchedEffect(Unit) { recordViewModel.loadRecords() }
     val records by recordViewModel.records.collectAsState()
@@ -107,6 +111,10 @@ fun RecordListScreen(
                     "설정", style = textStyle(22, 28, FontWeight.Bold, colors.textTertiary),
                     modifier = Modifier.clickable(onClick = onSettings).padding(8.q),
                 )
+                if (split) {
+                    Spacer(Modifier.width(16.q))
+                    HomeButton(onClick = onHome)
+                }
             }
             Spacer(Modifier.height(32.q))
             if (records.isEmpty()) {
@@ -137,6 +145,29 @@ fun RecordListScreen(
                 )
             }
         }
+        if (!split) {
+            HomeButton(
+                onClick = onHome,
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = 44.q, end = 56.q),
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = LocalAppColors.current
+    val shape = RoundedCornerShape(20.q)
+    Box(
+        modifier
+            .size(80.q)
+            .shadow(3.q, shape)
+            .background(colors.surface, shape)
+            .semantics { contentDescription = "홈으로 이동" }
+            .clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(AppIcon.HOME, 36.q, colors.textPrimary)
     }
 }
 

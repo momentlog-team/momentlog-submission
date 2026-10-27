@@ -69,6 +69,7 @@ fun AppNavHost(navController: NavHostController, viewModels: AppViewModels) {
                 onStatement = { navController.navigate(Routes.statement(it.id)) },
                 onSendToPhone = { navController.navigate(Routes.document(it.id)) },
                 onSettings = { navController.navigate(Routes.SETTINGS) },
+                onHome = toHome,
             )
         }
         composable(Routes.RECORD_DETAIL, arguments = recordIdArgument) { entry ->
@@ -118,7 +119,7 @@ fun AppNavHost(navController: NavHostController, viewModels: AppViewModels) {
             )
         }
         composable(Routes.SETTINGS) {
-            SettingsScreen(viewModels.main)
+            SettingsScreen(viewModels.main, onBack = { navController.popBackStack() })
         }
     }
 }
