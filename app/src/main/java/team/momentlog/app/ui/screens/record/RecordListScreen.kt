@@ -1,5 +1,10 @@
 package team.momentlog.app.ui.screens.record
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -136,13 +141,23 @@ fun RecordListScreen(
 
         if (!split && selected != null) {
             SidePanel(650, Modifier.align(Alignment.TopEnd)) {
-                Preview(
-                    selected, now,
-                    onOpen = { onOpen(selected) },
-                    onStatement = { onStatement(selected) },
-                    onRetain = { recordViewModel.retain(selected.id) },
-                    onSendToPhone = { onSendToPhone(selected) },
-                )
+                AnimatedContent(
+                    targetState = selected,
+                    contentKey = { it.id },
+                    modifier = Modifier.fillMaxSize(),
+                    transitionSpec = {
+                        fadeIn(tween(100)) togetherWith fadeOut(tween(100))
+                    },
+                    label = "recordPreview",
+                ) { record ->
+                    Preview(
+                        record, now,
+                        onOpen = { onOpen(record) },
+                        onStatement = { onStatement(record) },
+                        onRetain = { recordViewModel.retain(record.id) },
+                        onSendToPhone = { onSendToPhone(record) },
+                    )
+                }
             }
         }
         if (!split) {
@@ -284,34 +299,37 @@ private fun SmallChip(text: String, color: Color, background: Color, icon: AppIc
 private fun Preview(record: RecordInfo, now: Long, onOpen: () -> Unit, onStatement: () -> Unit, onRetain: () -> Unit, onSendToPhone: () -> Unit) {
     val colors = LocalAppColors.current
     val tone = record.kind.tone(colors)
-    Column(Modifier.fillMaxSize().padding(56.q).enterFromBelow(16.q, key = record.id)) {
-        StatusChip(record.kind.label, tone, icon = record.kind.icon)
+    Column(Modifier.fillMaxSize().padding(56.q)) {
+        StatusChip(record.kind.label, tone, icon = record.kind.icon, modifier = Modifier.enterFromBelow(12.q, durationMillis = 600, key = record.id))
         Spacer(Modifier.height(32.q))
-        Text(listTitle(record), style = textStyle(40, 52, FontWeight.ExtraBold))
+        Text(listTitle(record), style = textStyle(40, 52, FontWeight.ExtraBold), modifier = Modifier.enterFromBelow(20.q, 90, 650, record.id))
         Spacer(Modifier.height(24.q))
-        Text(Formats.clock(record.triggeredAtMillis), style = textStyle(48, 56, FontWeight.ExtraBold).copy(fontFeatureSettings = "tnum"))
-        Text(Formats.date(record.triggeredAtMillis), style = textStyle(24, 32, color = colors.textSecondary))
+        Text(Formats.clock(record.triggeredAtMillis), style = textStyle(48, 56, FontWeight.ExtraBold).copy(fontFeatureSettings = "tnum"), modifier = Modifier.enterFromBelow(20.q, 180, 650, record.id))
+        Text(Formats.date(record.triggeredAtMillis), style = textStyle(24, 32, color = colors.textSecondary), modifier = Modifier.enterFromBelow(16.q, 240, 650, record.id))
         Spacer(Modifier.height(24.q))
         val days = record.daysUntilDelete(now)
         InfoNote(
             if (days == null) "충격이 감지됐거나 진술을 남긴 기록은 자동으로 보관해요" else "보관하지 않으면 ${days}일 뒤 지워져요",
             size = 22,
+            modifier = Modifier.enterFromBelow(16.q, 310, 650, record.id),
         )
         Spacer(Modifier.weight(1f))
         Column(verticalArrangement = Arrangement.spacedBy(16.q)) {
             val full = Modifier.fillMaxWidth()
+            val first = full.enterFromBelow(20.q, 400, 650, record.id)
+            val second = full.enterFromBelow(20.q, 490, 650, record.id)
             when {
                 record.needsStatement -> {
-                    CustomButton("진술 추가", onStatement, full, primary = true, large = false, icon = AppIcon.MIC)
-                    CustomButton("결과 보기", onOpen, full, large = false)
+                    CustomButton("진술 추가", onStatement, first, primary = true, large = false, icon = AppIcon.MIC)
+                    CustomButton("결과 보기", onOpen, second, large = false)
                 }
                 days != null -> {
-                    CustomButton("보관하기", onRetain, full, primary = true, large = false, icon = AppIcon.LOCK)
-                    CustomButton("결과 보기", onOpen, full, large = false)
+                    CustomButton("보관하기", onRetain, first, primary = true, large = false, icon = AppIcon.LOCK)
+                    CustomButton("결과 보기", onOpen, second, large = false)
                 }
                 else -> {
-                    CustomButton("결과 보기", onOpen, full, primary = true, large = false)
-                    CustomButton("휴대폰으로 받기", onSendToPhone, full, large = false, icon = AppIcon.QR)
+                    CustomButton("결과 보기", onOpen, first, primary = true, large = false)
+                    CustomButton("휴대폰으로 받기", onSendToPhone, second, large = false, icon = AppIcon.QR)
                 }
             }
         }
