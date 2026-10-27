@@ -33,14 +33,13 @@ import team.momentlog.app.ui.screens.resume.ResumeReason
 import team.momentlog.app.ui.screens.use_case.StatementViewModel
 
 /**
- * 앱 최상위 화면. 전조등이 켜지면 밤 테마.
+ * 앱 최상위 화면. 차량 시스템의 주·야간 테마를 따른다.
  * 저장이 시작되면 저장 알림을 덮고, 저장이 끝난 뒤 정차 중이면 진술로 간다.
  * 주행이 다시 시작되면 대기 화면으로 돌아간다.
  */
 @Composable
 fun MomentlogApp(viewModels: AppViewModels) {
     val main = viewModels.main
-    val isNight by main.isNight.collectAsState()
     val isDriving by main.isDriving.collectAsState()
     val capture by main.capture.collectAsState()
     val recorderStatus by main.recorderStatus.collectAsState()
@@ -92,7 +91,7 @@ fun MomentlogApp(viewModels: AppViewModels) {
         navController.navigate(Routes.statement(id)) { popUpTo(Routes.HOME) }
     }
 
-    MomentlogTheme(night = isNight) {
+    MomentlogTheme {
         Box(Modifier.fillMaxSize()) {
             AppNavHost(navController, viewModels)
 

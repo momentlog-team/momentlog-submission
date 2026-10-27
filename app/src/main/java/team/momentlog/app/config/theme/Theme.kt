@@ -1,6 +1,7 @@
 package team.momentlog.app.config.theme
 
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -19,7 +20,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** 색 토큰. 낮/밤 두 벌을 두고 전조등 상태로 고른다. */
+/** 색 토큰. 낮/밤 두 벌을 두고 시스템 테마에 맞춰 고른다. */
 @Immutable
 data class MomentlogColors(
     val bg: Color,
@@ -97,7 +98,7 @@ fun textStyle(size: Int, lineHeight: Int? = null, weight: FontWeight = FontWeigh
     )
 
 @Composable
-fun MomentlogTheme(night: Boolean = false, content: @Composable () -> Unit) {
+fun MomentlogTheme(night: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     val colors = if (night) NightColors else DayColors
     val scheme = if (night) {
         darkColorScheme(primary = colors.accent, background = colors.bg, surface = colors.surface, onSurface = colors.textPrimary)

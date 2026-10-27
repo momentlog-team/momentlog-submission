@@ -17,7 +17,7 @@ import team.momentlog.core.Snapshot
 import java.util.Calendar
 
 /**
- * 앱 전체 상태: 주행 중인지, 기록 서비스 상태, 낮/밤 테마, 진행 중인 저장.
+ * 앱 전체 상태: 주행 중인지, 기록 서비스 상태, 진행 중인 저장.
  */
 class MainViewModel(application: Application) : BaseViewModel(application) {
 
@@ -34,9 +34,6 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
     val isDriving: StateFlow<Boolean> = combine(drivingMonitor.isDriving, live) { restricted, snapshot ->
         restricted || (snapshot?.speedKph ?: 0f) >= Constant.RESUME_SPEED_KPH
     }.distinctUntilChanged().stateIn(viewModelScope, SharingStarted.Eagerly, false)
-
-    val isNight: StateFlow<Boolean> = live.map { it?.lowBeam == true || it?.highBeam == true }
-        .distinctUntilChanged().stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     /** 차종이 지원하지 않거나 값을 못 받은 신호. 서비스가 꺼져 있으면 빈 목록. */
     val unsupportedSignals: StateFlow<List<String>> = live.map { s ->
