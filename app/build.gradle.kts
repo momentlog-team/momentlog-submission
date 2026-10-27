@@ -17,6 +17,8 @@ android {
         versionName = "0.1.0"
         // 에뮬레이터에서 PC의 서버(localhost:8090)에 붙을 때 주소. 실차·시연 환경에 맞게 바꾼다.
         buildConfigField("String", "SEAL_SERVER", "\"http://10.0.2.2:8090\"")
+        // QR로 휴대폰에 넘기는 문서 페이지 주소. 실차·시연 환경에 맞게 바꾼다.
+        buildConfigField("String", "DOCUMENT_BASE_URL", "\"http://10.0.2.2:8090/r/\"")
     }
 
     buildTypes {
@@ -57,4 +59,6 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    // QR 그리기
+    implementation("com.google.zxing:core:3.5.3")
 }
