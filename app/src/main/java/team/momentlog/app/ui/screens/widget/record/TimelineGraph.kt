@@ -49,6 +49,7 @@ fun TimelineGraph(
     modifier: Modifier = Modifier,
     compact: Boolean = false,
     animate: Boolean = true,
+    playheadMillis: Long? = null,
 ) {
     val colors = LocalAppColors.current
     val pxToDp = LocalQhd.current.pxToDp
@@ -70,6 +71,11 @@ fun TimelineGraph(
         clipRect(right = graph.gutter + graph.plotWidth * draw.value) { graph.drawData(this) }
         graph.drawMarkers(this, markers, markerAlpha.value)
         graph.drawAxis(this)
+        playheadMillis?.let { time ->
+            val cursorX = graph.x(time - triggerAtMillis).coerceIn(graph.gutter, graph.gutter + graph.plotWidth)
+            drawLine(colors.accent, Offset(cursorX, 0f), Offset(cursorX, size.height - 40 * u), 2 * u)
+            drawCircle(colors.accent, 5 * u, Offset(cursorX, 5 * u))
+        }
     }
 }
 

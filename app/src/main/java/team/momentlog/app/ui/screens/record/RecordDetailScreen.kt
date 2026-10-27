@@ -1,5 +1,9 @@
 package team.momentlog.app.ui.screens.record
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
@@ -16,12 +20,16 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -58,6 +66,16 @@ import team.momentlog.app.ui.screens.widget.record.StepTimeline
 import team.momentlog.app.ui.screens.widget.record.TimelineGraph
 import team.momentlog.app.ui.screens.widget.record.TimelineStep
 import team.momentlog.core.TurnSignal
+import team.momentlog.core.Snapshot
+import team.momentlog.core.Trigger
+import team.momentlog.app.ui.models.snapshotAt
+import team.momentlog.app.ui.models.relativeText
+import team.momentlog.app.ui.screens.widget.car.DrivingPlaybackCar
+import team.momentlog.app.ui.screens.widget.record.SignalTelemetry
+import team.momentlog.app.ui.screens.widget.icon.Icon
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
 
 /**
  * 결과 화면. 차 밖의 상대 운전자나 경찰도 읽는 화면이라 한 줄 경위를 가장 크게 둔다.
@@ -82,19 +100,40 @@ fun RecordDetailScreen(
             Text("기록을 불러오고 있어요", style = textStyle(30, 42, color = LocalAppColors.current.textSecondary), modifier = Modifier.align(Alignment.Center))
             return@AppScreen
         }
-        if (isSplit) ResultSplit(current, onSendToPhone, onStatement) else ResultFull(current, onSendToPhone, onOpenRecords, onStatement)
+        var replayKey by remember(current.id) { mutableIntStateOf(0) }
+        var playing by remember(current.id) { mutableStateOf(true) }
+        val progress = remember(current.id, replayKey) { Animatable(0f) }
+        val start = maxOf(current.startMillis, current.triggeredAtMillis - 10_000)
+        val end = maxOf(current.triggeredAtMillis, current.events.filter { it.trigger == Trigger.AIRBAG }.maxOfOrNull { it.atMillis } ?: current.triggeredAtMillis).coerceAtMost(current.endMillis)
+        LaunchedEffect(current.id, replayKey, playing) {
+            if (playing) progress.animateTo(1f, tween((6000 * (1 - progress.value)).toInt().coerceAtLeast(1), if (progress.value == 0f) 450 else 0, LinearEasing))
+        }
+        val playhead = start + ((end - start) * progress.value).toLong()
+        val snapshot = current.snapshotAt(playhead)
+        val finished = progress.value >= 1f
+        val replay: () -> Unit = {
+            if (finished) { replayKey++; playing = true } else playing = !playing
+        }
+        if (isSplit) ResultSplit(current, onSendToPhone, onStatement, snapshot, playhead, replay, playing, finished)
+        else ResultFull(current, onSendToPhone, onOpenRecords, onStatement, snapshot, playhead, replay, playing, finished)
     }
 }
 
 @Composable
-private fun BoxScope.ResultFull(record: RecordInfo, onSendToPhone: () -> Unit, onOpenRecords: () -> Unit, onStatement: () -> Unit) {
+private fun BoxScope.ResultFull(record: RecordInfo, onSendToPhone: () -> Unit, onOpenRecords: () -> Unit, onStatement: () -> Unit, snapshot: Snapshot?, playhead: Long, onReplay: () -> Unit, playing: Boolean, finished: Boolean) {
     val colors = LocalAppColors.current
     val tone = record.kind.tone(colors)
 
     SidePanel(540) {
-        Text("0초 · ${momentTitle(record.kind)}", style = textStyle(22, 28, FontWeight.Bold, colors.textSecondary), modifier = Modifier.offset(48.q, 136.q))
-        MomentCar(record, Modifier.offset(160.q, 206.q).size(220.q, 440.q))
-        MomentNumbers(record, Modifier.align(Alignment.BottomStart).padding(start = 48.q, bottom = 52.q))
+        Row(Modifier.fillMaxWidth().padding(start = 48.q, top = 100.q, end = 48.q), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(relativeText((playhead - record.triggeredAtMillis) / 1000f), style = textStyle(32, 40, FontWeight.Bold))
+                Text(if (finished) "기록 재생 완료" else if (playing) "차량 신호 재생" else "일시정지", style = textStyle(20, 28, color = colors.textSecondary))
+            }
+            PlaybackButton(playing, finished, onReplay)
+        }
+        MomentCar(record, snapshot, playhead, Modifier.offset(160.q, 230.q).size(220.q, 440.q))
+        SignalTelemetry(snapshot, Modifier.align(Alignment.BottomStart).padding(start = 48.q, bottom = 52.q).width(444.q))
     }
 
     Row(
@@ -119,6 +158,7 @@ private fun BoxScope.ResultFull(record: RecordInfo, onSendToPhone: () -> Unit, o
     TimelineGraph(
         record.snapshots, record.triggeredAtMillis, markers(record, colors),
         Modifier.offset(580.q, 600.q).size(1014.q, 330.q),
+        animate = false, playheadMillis = playhead,
     )
 
     Row(
@@ -135,7 +175,7 @@ private fun BoxScope.ResultFull(record: RecordInfo, onSendToPhone: () -> Unit, o
 }
 
 @Composable
-private fun ResultSplit(record: RecordInfo, onSendToPhone: () -> Unit, onStatement: () -> Unit) {
+private fun ResultSplit(record: RecordInfo, onSendToPhone: () -> Unit, onStatement: () -> Unit, snapshot: Snapshot?, playhead: Long, onReplay: () -> Unit, playing: Boolean, finished: Boolean) {
     val colors = LocalAppColors.current
     val tone = record.kind.tone(colors)
     Box(Modifier.fillMaxSize()) {
@@ -147,11 +187,16 @@ private fun ResultSplit(record: RecordInfo, onSendToPhone: () -> Unit, onStateme
         Column(Modifier.padding(start = 40.q, end = 40.q, top = 144.q)) {
             Text(headline(record, colors), style = textStyle(44, 58, FontWeight.ExtraBold), maxLines = 2)
         }
-        MomentCar(record, Modifier.offset(70.q, 346.q).size(155.q, 311.q))
-        StepTimeline(steps(record, colors), Modifier.padding(start = 320.q, end = 40.q, top = 352.q), compact = true)
+        MomentCar(record, snapshot, playhead, Modifier.offset(70.q, 346.q).size(155.q, 311.q))
+        Row(Modifier.offset(40.q, 280.q).width(744.q), verticalAlignment = Alignment.CenterVertically) {
+            Text(relativeText((playhead - record.triggeredAtMillis) / 1000f), style = textStyle(24, 32, FontWeight.Bold), modifier = Modifier.weight(1f))
+            PlaybackButton(playing, finished, onReplay)
+        }
+        SignalTelemetry(snapshot, Modifier.offset(320.q, 346.q).width(464.q))
         TimelineGraph(
             record.snapshots, record.triggeredAtMillis, markers(record, colors),
             Modifier.offset(40.q, 690.q).size(744.q, 250.q), compact = true,
+            animate = false, playheadMillis = playhead,
         )
         Column(Modifier.padding(start = 40.q, end = 40.q, top = 966.q)) {
             Text(Formats.clock(record.triggeredAtMillis), style = textStyle(40, 48, FontWeight.ExtraBold).copy(fontFeatureSettings = "tnum"))
@@ -161,75 +206,23 @@ private fun ResultSplit(record: RecordInfo, onSendToPhone: () -> Unit, onStateme
     }
 }
 
-/** 감지 순간의 내 차. 그때 켜져 있던 램프를 그린다. */
 @Composable
-private fun MomentCar(record: RecordInfo, modifier: Modifier) {
+private fun PlaybackButton(playing: Boolean, finished: Boolean, onClick: () -> Unit) {
     val colors = LocalAppColors.current
-    val at = record.facts.atTrigger
-    val lamps = CarLamps(
-        turnRight = at?.turn == TurnSignal.RIGHT,
-        turnLeft = at?.turn == TurnSignal.LEFT,
-        brake = at?.brake == true,
-        head = at?.lowBeam == true || at?.highBeam == true,
-    )
-    Box(modifier) {
-        CarDrawing(Modifier.fillMaxSize(), lamps)
-        Canvas(Modifier.fillMaxSize()) {
-            val k = size.width / 200f
-            val glow = 6 * k
-            listOfNotNull(
-                if (lamps.turnRight) listOf(Offset(176f, 44f), Offset(184f, 60f), Offset(178f, 352f), Offset(184f, 366f)) else null,
-                if (lamps.turnLeft) listOf(Offset(24f, 44f), Offset(16f, 60f), Offset(22f, 352f), Offset(16f, 366f)) else null,
-            ).flatten().forEach { p ->
-                val dir = if (p.x > 100) 1 else -1
-                drawLine(colors.dataTurn, Offset(p.x * k, p.y * k), Offset((p.x + dir * 12) * k, (p.y - 6) * k), glow, StrokeCap.Round)
-            }
-            if (lamps.brake) {
-                listOf(70f, 100f, 130f).forEach { x ->
-                    drawLine(colors.dataBrake, Offset(x * k, 392f * k), Offset(x * k, 408f * k), 3 * k, StrokeCap.Round)
-                }
-            }
-            if (record.kind == RecordKind.IMPACT) {
-                drawArc(
-                    colors.danger, 20f, 140f, false, Offset(10f * k, 360f * k), androidx.compose.ui.geometry.Size(180f * k, 60f * k),
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(10 * k, cap = StrokeCap.Round),
-                )
-            }
-        }
+    val label = if (finished) "처음부터 다시 재생" else if (playing) "일시정지" else "이어서 재생"
+    Box(
+        Modifier.size(64.q).background(colors.surface, RoundedCornerShape(20.q))
+            .semantics { contentDescription = label }.clickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(if (finished) AppIcon.REDO else if (playing) AppIcon.PAUSE else AppIcon.PLAY, 30.q, colors.textPrimary)
     }
 }
 
+/** 기록 시각에 맞춰 도로·차체·램프를 재생한다. */
 @Composable
-private fun MomentNumbers(record: RecordInfo, modifier: Modifier) {
-    val colors = LocalAppColors.current
-    val at = record.facts.atTrigger
-    Column(modifier) {
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(at?.speedKph?.roundToInt()?.toString() ?: "–", style = textStyle(72, 80, FontWeight.ExtraBold).copy(fontFeatureSettings = "tnum"))
-            Spacer(Modifier.width(8.q))
-            Text("km/h", style = textStyle(30, 48, color = colors.textSecondary))
-        }
-        Spacer(Modifier.height(12.q))
-        val turn = when (at?.turn) {
-            TurnSignal.RIGHT -> "우측 방향지시등 켜짐" to colors.dataTurn
-            TurnSignal.LEFT -> "좌측 방향지시등 켜짐" to colors.dataTurn
-            TurnSignal.OFF -> "방향지시등 꺼짐" to colors.textTertiary
-            null -> "방향지시등 정보 없음" to colors.textTertiary
-        }
-        val brake = when (at?.brake) {
-            true -> "브레이크 밟는 중" to colors.dataBrake
-            false -> "브레이크 안 밟음" to colors.textTertiary
-            null -> "브레이크 정보 없음" to colors.textTertiary
-        }
-        val steer = "핸들 ${steeringText(at?.steeringDeg)}" to colors.textTertiary
-        listOf(turn, brake, steer).forEach { (text, dot) ->
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.q)) {
-                Box(Modifier.size(12.q).background(dot, CircleShape))
-                Spacer(Modifier.width(10.q))
-                Text(text, style = textStyle(24, 32))
-            }
-        }
-    }
+private fun MomentCar(record: RecordInfo, at: Snapshot?, playhead: Long, modifier: Modifier) {
+    DrivingPlaybackCar(record, at, playhead, modifier)
 }
 
 @Composable
@@ -332,5 +325,5 @@ private fun steps(record: RecordInfo, colors: MomentlogColors): List<TimelineSte
 private fun markers(record: RecordInfo, colors: MomentlogColors): List<GraphMarker> =
     record.events.map { e ->
         val kind = if (e.atMillis == record.triggeredAtMillis && e.trigger == record.trigger) record.kind else RecordKind.of(e)
-        GraphMarker((e.atMillis - record.triggeredAtMillis) / 1000f, null, kind.tone(colors))
+        GraphMarker((e.atMillis - record.triggeredAtMillis) / 1000f, if (e.trigger == Trigger.AIRBAG) "충격 감지" else null, kind.tone(colors))
     }

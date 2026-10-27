@@ -36,6 +36,9 @@ enum class AppIcon(val stroke: String, val fill: String? = null, val width: Floa
     WARN("M12 6v8M12 18h.01", width = 2.6f),
     BACK("M15 5l-7 7 7 7", width = 2.4f),
     HOME("M3 10l9-7 9 7M5 9v12h5v-7h4v7h5V9", width = 2.2f),
+    PLAY("M8 4l12 8-12 8z", fill = "M8 4l12 8-12 8z", width = 1.4f),
+    PAUSE("M8 5v14M16 5v14", width = 3.2f),
+    BRAKE(circle(12f, 12f, 6f) + " M4 5a10 10 0 0 0 0 14M20 5a10 10 0 0 1 0 14M12 8v5M12 16v.01", width = 2f),
     NEXT("M9 6l6 6-6 6", width = 2.4f),
     X("M6 6l12 12M18 6L6 18", width = 2.8f),
 }
