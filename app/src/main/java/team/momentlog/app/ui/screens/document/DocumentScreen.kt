@@ -1,17 +1,20 @@
 package team.momentlog.app.ui.screens.document
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -19,62 +22,172 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import team.momentlog.app.config.theme.color111111
-import team.momentlog.app.config.theme.color1F9D55
-import team.momentlog.app.config.theme.color6B6B6B
-import team.momentlog.app.config.theme.colorE5E5E5
-import team.momentlog.app.config.theme.colorE6F6EC
+import androidx.compose.ui.text.style.TextAlign
+import team.momentlog.app.config.theme.LocalAppColors
+import team.momentlog.app.config.theme.isSplit
+import team.momentlog.app.config.theme.q
+import team.momentlog.app.config.theme.textStyle
+import team.momentlog.app.ui.common.CustomButton
+import team.momentlog.app.ui.models.Formats
 import team.momentlog.app.ui.screens.use_case.DocumentViewModel
 import team.momentlog.app.ui.screens.use_case.RecordViewModel
+import team.momentlog.app.ui.screens.widget.icon.AppIcon
+import team.momentlog.app.ui.screens.widget.icon.Icon
+import team.momentlog.app.ui.screens.widget.label.StatusChip
+import team.momentlog.app.ui.screens.widget.layout.AppScreen
+import team.momentlog.app.ui.screens.widget.layout.SidePanel
+import team.momentlog.app.ui.screens.widget.motion.enterFromBelow
+import team.momentlog.app.ui.screens.widget.qr.QrCode
 
 /**
- * 5 문서 받기. 왼쪽 PDF 미리보기, 오른쪽 휴대폰으로 받는 QR과 봉인 상태.
- * TODO(앱): PDF 미리보기, QR 그리기(문서 API가 나오면)
+ * 휴대폰으로 받기(QR).
  */
 @Composable
-fun DocumentScreen(recordId: String, recordViewModel: RecordViewModel, documentViewModel: DocumentViewModel) {
+fun DocumentScreen(recordId: String, recordViewModel: RecordViewModel, documentViewModel: DocumentViewModel, onBack: () -> Unit) {
+    LaunchedEffect(recordId) { recordViewModel.loadRecord(recordId) }
     val record by recordViewModel.selected.collectAsState()
-    val verify by documentViewModel.verify.collectAsState()
-    val failure by documentViewModel.failure.collectAsState()
+    val online by documentViewModel.online.collectAsState()
+    val openedAt by documentViewModel.openedAtMillis.collectAsState()
+    val current = record?.takeIf { it.id == recordId }
 
-    LaunchedEffect(record) {
-        record?.takeIf { it.id == recordId }?.let(documentViewModel::checkSeal)
+    LaunchedEffect(current?.id, online) {
+        if (online) current?.let(documentViewModel::checkSeal)
     }
 
-    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
-        Box(
-            Modifier.weight(1f).fillMaxHeight().border(BorderStroke(1.dp, colorE5E5E5), RoundedCornerShape(8.dp)).padding(24.dp),
-        ) {
-            Text("사고 정리 문서 미리보기", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = color111111)
+    val colors = LocalAppColors.current
+    val split = isSplit
+    AppScreen(drivingAllowed = false) {
+        val panelHeight = if (split) 560.q else null
+        val qrState = when {
+            !online -> QrState.OFFLINE
+            openedAt != null -> QrState.OPENED
+            else -> QrState.READY
         }
-        Column(
-            Modifier.weight(1f).fillMaxHeight(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-        ) {
-            Box(
-                Modifier.size(220.dp).border(BorderStroke(1.dp, colorE5E5E5), RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center,
-            ) { Text("QR", color = color6B6B6B) }
-            Text("휴대폰 카메라로 찍어서 받기", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = color111111)
-            Text("블랙박스 영상과 함께 보험사·경찰에 내세요", fontSize = 15.sp, color = color6B6B6B)
-            val sealText = when {
-                verify != null -> "서버 봉인 확인 · ${verify?.status}"
-                failure != null -> failure.toString()
-                else -> "봉인 확인 중"
+        val qrPanel: @Composable () -> Unit = {
+            Column(
+                Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                QrCard(qrState, current?.let(documentViewModel::documentUrl), if (split) 420 else 560, if (split) 360 else 480)
+                Spacer(Modifier.height(24.q))
+                Text("문서에는 경위 문장과 그래프, 원본 대조 QR이 들어가요", style = textStyle(24, 32, color = colors.textSecondary), textAlign = TextAlign.Center)
             }
+        }
+        if (split) {
+            Box(Modifier.fillMaxWidth().height(panelHeight!!).background(colors.surfaceSunk)) { qrPanel() }
+        } else {
+            SidePanel(700) { qrPanel() }
+        }
+
+        Column(
+            Modifier
+                .padding(start = if (split) 40.q else 748.q, end = if (split) 40.q else 64.q, top = if (split) 600.q else 44.q)
+                .enterFromBelow(16.q, key = qrState),
+        ) {
+            when (qrState) {
+                QrState.READY -> StatusChip("휴대폰으로 받기", colors.accent, icon = AppIcon.QR)
+                QrState.OPENED -> StatusChip("휴대폰에서 열었어요 · ${Formats.clock(openedAt!!)}", colors.recording, icon = AppIcon.CHECK)
+                QrState.OFFLINE -> StatusChip("통신 연결 안 됨", colors.warning, icon = AppIcon.OFFLINE)
+            }
+            Spacer(Modifier.height(if (split) 24.q else 54.q))
             Text(
-                sealText,
-                fontSize = 15.sp,
-                color = color111111,
-                modifier = Modifier
-                    .background(colorE6F6EC, RoundedCornerShape(20.dp))
-                    .border(BorderStroke(1.dp, color1F9D55), RoundedCornerShape(20.dp))
-                    .padding(horizontal = 20.dp, vertical = 10.dp),
+                when (qrState) {
+                    QrState.READY -> "휴대폰 카메라로 찍으세요"
+                    QrState.OPENED -> "휴대폰에서 문서를 받으세요"
+                    QrState.OFFLINE -> "연결되면 바로 QR을 만들게요"
+                },
+                style = textStyle(if (split) 48 else 60, if (split) 62 else 76, FontWeight.ExtraBold),
             )
+            Spacer(Modifier.height(16.q))
+            Text(
+                if (qrState == QrState.OFFLINE && current != null) {
+                    "원본 시각은 저장 순간(${Formats.clock(current.triggeredAtMillis)})으로 고정되어 늦게 보내도 바뀌지 않아요"
+                } else {
+                    "보험사·경찰에 블랙박스 영상과 함께 내세요"
+                },
+                style = textStyle(30, 42, color = colors.textSecondary),
+            )
+            if (!split) {
+                Spacer(Modifier.height(80.q))
+                Steps()
+                Spacer(Modifier.height(64.q))
+                HorizontalDivider(thickness = 2.q, color = colors.line)
+                Spacer(Modifier.height(32.q))
+                current?.let { r ->
+                    Text(r.narrative.getOrNull(1) ?: r.kind.label, style = textStyle(28, 38, FontWeight.Bold), maxLines = 2)
+                    Spacer(Modifier.height(8.q))
+                    Text("${Formats.date(r.triggeredAtMillis)} · ${Formats.clock(r.triggeredAtMillis)}", style = textStyle(24, 32, color = colors.textSecondary))
+                    Spacer(Modifier.height(8.q))
+                    Text(if (r.sealed) "원본 지문을 서버에 봉인했어요" else "원본 지문을 아직 서버에 보내지 못했어요", style = textStyle(24, 32, color = colors.textTertiary))
+                }
+            }
+        }
+
+        CustomButton(
+            "결과 화면으로", onBack,
+            Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = if (split) 40.q else 748.q, bottom = 64.q)
+                .then(if (split) Modifier.padding(end = 40.q).fillMaxWidth() else Modifier),
+            icon = AppIcon.BACK,
+        )
+    }
+}
+
+private enum class QrState { READY, OPENED, OFFLINE }
+
+@Composable
+private fun QrCard(state: QrState, url: String?, cardSize: Int, qrSize: Int) {
+    val colors = LocalAppColors.current
+    val shape = RoundedCornerShape(28.q)
+    Box(
+        Modifier
+            .size(cardSize.q)
+            .then(if (state == QrState.OFFLINE) Modifier else Modifier.shadow(12.q, shape, ambientColor = Color(0x1A10151B), spotColor = Color(0x1A10151B)).background(Color.White, shape)),
+        contentAlignment = Alignment.Center,
+    ) {
+        when {
+            state == QrState.OFFLINE -> {
+                val unit = 1.q
+                Canvas(Modifier.fillMaxSize()) {
+                    val u = unit.toPx()
+                    drawRoundRect(
+                        colors.line, cornerRadius = androidx.compose.ui.geometry.CornerRadius(28 * u),
+                        style = Stroke(4 * u, pathEffect = PathEffect.dashPathEffect(floatArrayOf(14 * u, 10 * u))),
+                    )
+                }
+                Text(
+                    "통신이 연결되면\n여기에 QR이 나타나요",
+                    style = textStyle(28, 40, color = colors.textSecondary), textAlign = TextAlign.Center,
+                )
+            }
+            url != null -> {
+                QrCode(url, Modifier.size(qrSize.q))
+                if (state == QrState.OPENED) {
+                    Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = 0.88f), shape), contentAlignment = Alignment.Center) {
+                        Icon(AppIcon.CHECK, 160.q, colors.recording)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Steps() {
+    val colors = LocalAppColors.current
+    Column(verticalArrangement = Arrangement.spacedBy(20.q)) {
+        listOf("기본 카메라 켜기", "이 QR 비추기", "링크 열고 PDF 받기").forEachIndexed { i, text ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("${i + 1}", style = textStyle(22, 28, FontWeight.ExtraBold, colors.accent), modifier = Modifier.width(36.q))
+                Text(text, style = textStyle(30, 40, FontWeight.Bold))
+            }
         }
     }
 }

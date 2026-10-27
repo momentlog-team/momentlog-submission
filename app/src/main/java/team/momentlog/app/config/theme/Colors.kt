@@ -2,23 +2,41 @@ package team.momentlog.app.config.theme
 
 import androidx.compose.ui.graphics.Color
 
-// 색 규칙: 빨강 = 기록·충돌, 노랑 = 방향지시등·주행 중, 초록 = 정상·봉인, 파랑 = 주요 버튼·속도선
+// 화면에서는 이 상수 대신 LocalAppColors를 쓴다(낮/밤 테마). 빨강(danger)은 충격 감지와 위변조에만 쓴다.
 
 val colorFFFFFF = Color(0xFFFFFFFF)
-val color111111 = Color(0xFF111111)
-val color6B6B6B = Color(0xFF6B6B6B)
-val color9E9E9E = Color(0xFF9E9E9E)
-val colorE5E5E5 = Color(0xFFE5E5E5)
-val colorF5F5F5 = Color(0xFFF5F5F5)
+val color10151B = Color(0xFF10151B)
 
-val color2F6FDE = Color(0xFF2F6FDE)
-val colorEAF1FF = Color(0xFFEAF1FF)
+// 낮 테마
+val colorE9EDF1 = Color(0xFFE9EDF1) // bg
+val colorDDE2E8 = Color(0xFFDDE2E8) // surface-sunk
+val colorC9D0D8 = Color(0xFFC9D0D8) // line
+val color56606C = Color(0xFF56606C) // text-secondary
+val color8A939E = Color(0xFF8A939E) // text-tertiary
+val color2F6FEB = Color(0xFF2F6FEB) // accent
+val color12A071 = Color(0xFF12A071) // recording
+val colorC77A00 = Color(0xFFC77A00) // warning
+val colorD3D9E0 = Color(0xFFD3D9E0) // road
+val colorB7C0CA = Color(0xFFB7C0CA) // car-edge
 
-val colorD93B3B = Color(0xFFD93B3B)
-val colorFDECEC = Color(0xFFFDECEC)
+// 밤 테마
+val color1A1F25 = Color(0xFF1A1F25)
+val color252B33 = Color(0xFF252B33)
+val color20262D = Color(0xFF20262D)
+val color3A424C = Color(0xFF3A424C)
+val colorF1F3F6 = Color(0xFFF1F3F6)
+val colorA3ADB9 = Color(0xFFA3ADB9)
+val color737D89 = Color(0xFF737D89)
+val color5B92FF = Color(0xFF5B92FF)
+val color2BC48A = Color(0xFF2BC48A)
+val colorF5A524 = Color(0xFFF5A524) // 밤 warning, 데이터 방향지시등
+val color2A3038 = Color(0xFF2A3038)
+val color4A535E = Color(0xFF4A535E)
+val color3A424D = Color(0xFF3A424D)
+val color4B5562 = Color(0xFF4B5562)
 
-val colorF2A516 = Color(0xFFF2A516)
-val colorFFF4DC = Color(0xFFFFF4DC)
-
-val color1F9D55 = Color(0xFF1F9D55)
-val colorE6F6EC = Color(0xFFE6F6EC)
+// 공통
+val colorE0313C = Color(0xFFE0313C) // danger
+val colorF0505A = Color(0xFFF0505A) // 데이터 브레이크
+val color36C5D6 = Color(0xFF36C5D6) // 데이터 조향각
+val colorE8ECF1 = Color(0xFFE8ECF1) // 어두운 바탕의 속도선

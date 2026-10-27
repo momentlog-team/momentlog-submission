@@ -10,7 +10,7 @@ import team.momentlog.app.core.data.repository.RecordRepository
 import team.momentlog.app.ui.models.RecordInfo
 import team.momentlog.core.IncidentNarrator
 
-/** 기록 목록(6)과 기록 상세(4). 새 기록이 저장되면 목록을 다시 읽는다. */
+/** 기록 목록과 결과 화면. 새 기록이 저장되면 목록을 다시 읽는다. */
 class RecordViewModel(application: Application) : BaseViewModel(application) {
 
     private val recordRepository = RecordRepository(application)
@@ -44,5 +44,14 @@ class RecordViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
-    // TODO(앱): 보관(retain), 삭제
+    /** 7일 자동 삭제에서 뺀다. */
+    fun retain(recordId: String) {
+        viewModelScope.launch {
+            recordRepository.retain(recordId)
+            loadRecords()
+            if (_selected.value?.id == recordId) loadRecord(recordId)
+        }
+    }
+
+    // TODO(앱): 삭제
 }

@@ -1,17 +1,24 @@
 package team.momentlog.app.ui.screens.statement
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.core.InfiniteRepeatableSpec
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -19,70 +26,218 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import team.momentlog.app.config.theme.color111111
-import team.momentlog.app.config.theme.color6B6B6B
-import team.momentlog.app.config.theme.color9E9E9E
-import team.momentlog.app.config.theme.colorE5E5E5
-import team.momentlog.app.config.theme.colorEAF1FF
+import androidx.compose.ui.text.withStyle
+import team.momentlog.app.config.theme.LocalAppColors
+import team.momentlog.app.config.theme.isSplit
+import team.momentlog.app.config.theme.q
+import team.momentlog.app.config.theme.textStyle
 import team.momentlog.app.ui.common.CustomButton
+import team.momentlog.app.ui.models.Formats
+import team.momentlog.app.ui.models.RecordInfo
+import team.momentlog.app.ui.models.RecordKind
 import team.momentlog.app.ui.screens.use_case.StatementViewModel
+import team.momentlog.app.ui.screens.use_case.StatementViewModel.Step
+import team.momentlog.app.ui.screens.widget.car.ImpactArc
+import team.momentlog.app.ui.screens.widget.car.RoadStage
+import team.momentlog.app.ui.screens.widget.icon.AppIcon
+import team.momentlog.app.ui.screens.widget.label.PlateBadge
+import team.momentlog.app.ui.screens.widget.label.StatusChip
+import team.momentlog.app.ui.screens.widget.label.VoiceHint
+import team.momentlog.app.ui.screens.widget.layout.AppScreen
+import team.momentlog.app.ui.screens.widget.motion.enterFromBelow
 
-/** 3 정차 후 음성 진술. 왼쪽은 질문 3단계, 오른쪽은 지금 질문과 받아 적은 내용. */
+/**
+ * 정차 후 음성 진술.
+ */
 @Composable
 fun StatementScreen(
+    record: RecordInfo?,
     recordId: String,
     statementViewModel: StatementViewModel,
-    onLater: () -> Unit,
-    onDone: () -> Unit,
+    onSaved: () -> Unit,
+    onOpenRecords: () -> Unit,
+    onClose: () -> Unit,
 ) {
     LaunchedEffect(recordId) { statementViewModel.start(recordId) }
     val step by statementViewModel.step.collectAsState()
     val transcript by statementViewModel.transcript.collectAsState()
+    val partial by statementViewModel.partial.collectAsState()
+    val plate by statementViewModel.plate.collectAsState()
+    val colors = LocalAppColors.current
+    val split = isSplit
+    val kind = record?.kind ?: RecordKind.HARD_STOP
+    val tone = kind.tone(colors)
 
-    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
-        Column(Modifier.width(240.dp).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            StatementViewModel.Step.entries.forEach { item ->
-                val current = item == step
-                val done = item.ordinal < step.ordinal
-                Text(
-                    "${item.ordinal + 1}  ${item.question}",
-                    fontSize = 16.sp,
-                    fontWeight = if (current) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (current || done) color111111 else color9E9E9E,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(if (current) colorEAF1FF else androidx.compose.ui.graphics.Color.Transparent, RoundedCornerShape(12.dp))
-                        .padding(14.dp),
-                )
+    AppScreen(drivingAllowed = false) {
+        RoadStage(
+            parked = true,
+            dim = step == Step.LISTENING,
+            behindCar = { g ->
+                val unit = 1.q
+                Canvas(Modifier.fillMaxSize()) {
+                    val u = unit.toPx()
+                    drawRect(tone.copy(alpha = 0.22f), Offset(g.roadX * u, g.carRearY * u), Size(g.roadWidth * u, size.height - (g.carRearY + 40) * u))
+                    drawRect(tone, Offset((g.roadX - 10) * u, (g.carRearY - 3) * u), Size((g.roadWidth + 20) * u, 6 * u))
+                }
+            },
+            overCar = { g ->
+                if (kind == RecordKind.IMPACT) ImpactArc(rear = step != Step.LATER, g = g)
+                if (record != null) {
+                    Column(
+                        Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(start = if (split) 56.q else 590.q, bottom = 120.q),
+                    ) {
+                        Text("${Formats.clock(record.triggeredAtMillis)} 저장됨", style = textStyle(24, 30, FontWeight.Bold, tone))
+                        Text(kind.label, style = textStyle(20, 26, color = colors.textSecondary))
+                    }
+                }
+            },
+        )
+
+        Column(
+            (if (split) Modifier.padding(start = 360.q, end = 48.q, top = 112.q) else Modifier.fillMaxHeight().padding(start = 820.q, end = 80.q, bottom = 200.q))
+                .enterFromBelow(16.q, key = step),
+            verticalArrangement = if (split) Arrangement.Top else Arrangement.Center,
+        ) {
+            when (step) {
+                Step.ASK -> Ask()
+                Step.LISTENING -> Listening(transcript, partial)
+                Step.CONFIRM -> Confirm(transcript, plate)
+                Step.LATER -> Later()
             }
-            Spacer(Modifier.weight(1f))
-            Text("기록마다 한 번만 물어봐요", fontSize = 13.sp, color = color6B6B6B)
         }
-        Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            Text("“${step.question}”", fontSize = 28.sp, fontWeight = FontWeight.SemiBold, color = color111111)
-            Text("듣고 있어요", fontSize = 15.sp, color = color6B6B6B)
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 120.dp)
-                    .border(BorderStroke(1.dp, colorE5E5E5), RoundedCornerShape(12.dp))
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text("받아 적은 내용", fontSize = 13.sp, color = color6B6B6B)
-                Text(transcript.ifEmpty { "…" }, fontSize = 18.sp, color = color111111)
+
+        val actions: List<Triple<String, AppIcon?, () -> Unit>> = when (step) {
+            Step.ASK -> listOf(
+                Triple("말하기", AppIcon.MIC, statementViewModel::speak),
+                Triple("나중에", null, statementViewModel::later),
+            )
+            Step.LISTENING -> listOf(
+                Triple("다 말했어요", AppIcon.OK, statementViewModel::finishSpeaking),
+                Triple("처음부터", AppIcon.REDO, statementViewModel::restart),
+            )
+            // TODO(앱): "고치기"는 정차 중 키보드 입력 화면으로 연결
+            Step.CONFIRM -> listOf(
+                Triple("이대로 저장", AppIcon.OK, { statementViewModel.save(onSaved) }),
+                Triple("다시 말하기", AppIcon.REDO, statementViewModel::restart),
+            )
+            Step.LATER -> listOf(
+                Triple("기록 보기", AppIcon.LIST, onOpenRecords),
+                Triple("닫기", null, onClose),
+            )
+        }
+        val bottom = Modifier
+            .align(Alignment.BottomStart)
+            .padding(start = if (split) 360.q else 820.q, end = if (split) 48.q else 80.q, bottom = if (split) 80.q else 88.q)
+        if (split) {
+            Column(bottom.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.q)) {
+                actions.forEachIndexed { i, (label, icon, onClick) ->
+                    CustomButton(label, onClick, Modifier.fillMaxWidth(), primary = i == 0, icon = icon)
+                }
             }
-            Spacer(Modifier.weight(1f))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                CustomButton("나중에", onClick = onLater)
-                CustomButton("다시 말하기", onClick = statementViewModel::retry)
-                Spacer(Modifier.weight(1f))
-                CustomButton("다음", onClick = { if (statementViewModel.next()) onDone() }, primary = true)
+        } else {
+            Row(bottom, horizontalArrangement = Arrangement.spacedBy(16.q)) {
+                actions.forEachIndexed { i, (label, icon, onClick) ->
+                    CustomButton(label, onClick, primary = i == 0, icon = icon)
+                }
             }
         }
     }
+}
+
+@Composable
+private fun ColumnScope.Ask() {
+    val colors = LocalAppColors.current
+    StatusChip("기록을 저장했어요", colors.recording, icon = AppIcon.CHECK)
+    Spacer(Modifier.height(32.q))
+    Text("괜찮으세요?", style = textStyle(60, 80, FontWeight.ExtraBold))
+    Spacer(Modifier.height(16.q))
+    Text("상황을 말씀해 주시면 기록해 둘게요", style = textStyle(40, 52, color = colors.textSecondary))
+    Spacer(Modifier.height(48.q))
+    VoiceHint(null, "지금 말씀하시거나 “나중에”라고 하세요")
+}
+
+@Composable
+private fun ColumnScope.Listening(transcript: String, partial: String) {
+    val colors = LocalAppColors.current
+    StatusChip("듣고 있어요", colors.accent, icon = AppIcon.MIC)
+    Spacer(Modifier.height(32.q))
+    val cursorAlpha by rememberInfiniteTransition(label = "cursor")
+        .animateFloat(1f, 0f, InfiniteRepeatableSpec(tween(500), RepeatMode.Reverse), label = "cursorAlpha")
+    Row(verticalAlignment = Alignment.Bottom) {
+        Text(
+            buildAnnotatedString {
+                append(transcript)
+                if (transcript.isNotEmpty() && partial.isNotEmpty()) append(" ")
+                withStyle(SpanStyle(color = colors.textTertiary)) { append(partial) }
+            },
+            style = textStyle(40, 56, FontWeight.Bold),
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        Box(Modifier.padding(start = 6.q, bottom = 6.q).size(4.q, 44.q).background(colors.accent.copy(alpha = cursorAlpha)))
+    }
+    Spacer(Modifier.height(40.q))
+    SoundBars()
+    Spacer(Modifier.height(40.q))
+    VoiceHint(null, "상대 차 번호도 말씀해 주세요")
+}
+
+/** 소리 막대. 반복 모션은 정차 중 화면에만 쓴다. */
+@Composable
+private fun SoundBars() {
+    val colors = LocalAppColors.current
+    val transition = rememberInfiniteTransition(label = "bars")
+    Row(Modifier.height(96.q), horizontalArrangement = Arrangement.spacedBy(10.q), verticalAlignment = Alignment.CenterVertically) {
+        repeat(14) { i ->
+            val duration = 800 + (i * 137) % 500
+            val level by transition.animateFloat(0.18f, 1f, InfiniteRepeatableSpec(tween(duration), RepeatMode.Reverse), label = "bar$i")
+            Box(Modifier.width(12.q).fillMaxHeight(level).background(colors.accent, RoundedCornerShape(6.q)))
+        }
+    }
+}
+
+@Composable
+private fun ColumnScope.Confirm(transcript: String, plate: String?) {
+    val colors = LocalAppColors.current
+    Text("이렇게 적어 둘게요", style = textStyle(60, 80, FontWeight.ExtraBold))
+    Spacer(Modifier.height(32.q))
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(colors.surface, RoundedCornerShape(20.q))
+            .padding(horizontal = 44.q, vertical = 40.q),
+    ) {
+        Text("진술 · 운전자", style = textStyle(20, 26, FontWeight.Bold, colors.textTertiary))
+        Spacer(Modifier.height(12.q))
+        Text(transcript.ifBlank { "받아 적은 내용이 없어요" }, style = textStyle(30, 46, color = if (transcript.isBlank()) colors.textTertiary else colors.textPrimary))
+    }
+    Spacer(Modifier.height(32.q))
+    Text("상대 차량 번호", style = textStyle(24, 32, FontWeight.Bold, colors.textSecondary))
+    Spacer(Modifier.height(12.q))
+    if (plate != null) {
+        PlateBadge(plate, height = 88, fontSize = 44)
+    } else {
+        Text("말씀하신 번호가 없어요", style = textStyle(30, 42, color = colors.textTertiary))
+    }
+}
+
+@Composable
+private fun ColumnScope.Later() {
+    val colors = LocalAppColors.current
+    StatusChip("진술 미작성", colors.warning, icon = AppIcon.CLOCK)
+    Spacer(Modifier.height(32.q))
+    Text("알겠어요, 나중에 남겨도 돼요", style = textStyle(60, 80, FontWeight.ExtraBold))
+    Spacer(Modifier.height(16.q))
+    Text(
+        "기록은 저장해 두었어요. 기록 목록에서 정차 중 언제든 진술을 추가할 수 있어요.",
+        style = textStyle(30, 42, color = colors.textSecondary),
+    )
 }
