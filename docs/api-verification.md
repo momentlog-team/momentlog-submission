@@ -24,7 +24,7 @@
 
 - 위 Vehicle API는 모두 조회(State) API다. Pleos 문서상 Vehicle State는 "신청 없이 사용 가능".
 - 차량 제어(Vehicle Control, `CONTROL_CAR_*`)는 문서상 "준비 중". 이 앱은 쓰지 않는다.
-- TTS·STT·FusedLocation은 문서상 실차 배포용 "준비 중"이지만 공모전 FAQ의 허용 SDK다. 실차용 대체(안드로이드 기본)를 둔다.
+- 10/23 확인 당시 TTS·STT·FusedLocation은 실차 배포용 "준비 중"으로 안내되었다. 음성 기능의 10/27 재확인 내용은 아래를 따른다.
 - 공식 샘플 `blockedApis`: Telltale, TirePressure, `CarInfo.getCapabilityInfo`뿐. 위 API는 막혀 있지 않다.
 
 ## 에뮬레이터 실측 (2026-10-26)
@@ -52,4 +52,14 @@
 
 - ~~조향각 부호~~: 콘솔 음수 = 왼쪽(사용자가 주행 화면으로 확인). SDK 원값은 왼쪽 양수 → `VehicleSignalClient`에서 뒤집어 저장.
 - 에어백: 콘솔에 항목이 없어 확인 불가. 시연은 급정지 감지로 한다.
-- 음성 입력(마이크) 사용 가능 여부
+- 실제 한국어 음성 입력·인식 정확도: 아래 서비스 연결 확인과 별도로 실측 필요.
+
+## 음성 진술 연결 (2026-10-27)
+
+- 공식 [SpeechToText 안내](https://document.pleos.ai/en/docs/pleos-only/connect-sdk-pleos/SpeechToText/intro), [권한](https://document.pleos.ai/en/docs/pleos-only/connect-sdk-pleos/SpeechToText/declaring-permissions), [결과 리스너](https://document.pleos.ai/en/docs/pleos-only/connect-sdk-pleos/SpeechToText/result-listeners)를 확인하고 `SpeechToText:3.3.1`을 공식 Maven에서 가져왔다. `ON_DEVICE` 모드를 우선 사용하며 서버 인증 정보는 추가하지 않았다.
+- `pleos.car.permission.STT_SERVICE`는 현재 에뮬레이터에서 normal 권한이다. `RECORD_AUDIO`는 말하기 시 런타임 요청한다. 엔진 준비 실패 시 Android `SpeechRecognizer`로 전환한다.
+- 현재 arm64/API 34 에뮬레이터에서 공식 SDK 초기화·한국어 설정·요청·오디오 세션 시작 로그를 확인했다. 첫 오디오 시작까지 약 10초 소요되어 SDK 준비 제한을 30초로 두었다. 이는 한국어 인식 성공을 의미하지 않는다.
+- 조정 후 앱의 `듣고 있어요` 전환을 확인했다. 무음 상태에서 `다 말했어요`를 누르면 빈 진술 저장 대신 재시도 안내가 표시되며, 서비스의 `Session.stop(team.momentlog.app)`과 SDK 리스너 해제를 확인했다.
+- Android 표준 인식 서비스 `ai.umos.ambientai/.service.AmbRecognitionService`도 검색되지만 테스트에서는 준비 응답이 없어 제한 시간 후 안내하는 경로를 확인했다. 설치 여부만으로 동작을 보장하지 않는다.
+- 음성 안내는 Android `TextToSpeech`의 한국어 지원 엔진이 준비됐을 때만 재생한다. 실제 안내 음성과 사용자 발화의 한국어 인식·저장 전체 흐름은 추가 실측이 필요하다.
+- 지원 기기에서 확인할 순서: 진술 추가 → 말하기 → 마이크 허용 → 준비 완료 후 발화 → 임시/최종 문장 확인 → 이대로 저장 → 결과 화면에서 진술 확인. 무음·권한 거절·다시 말하기·앱 이탈·주행 재개도 함께 확인한다.
