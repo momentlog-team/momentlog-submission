@@ -74,6 +74,7 @@ fun RoadStage(
     lamps: CarLamps = CarLamps(),
     dim: Boolean = false,
     arrivalProgress: Float? = null,
+    carScale: Float = 1f,
     behindCar: @Composable BoxScope.(RoadGeometry) -> Unit = {},
     overCar: @Composable BoxScope.(RoadGeometry) -> Unit = {},
 ) {
@@ -108,6 +109,7 @@ fun RoadStage(
             Modifier
                 .offset(g.carX.q, (g.carY + (1f - (arrivalProgress ?: 1f)) * (1180 - g.carY)).q)
                 .size(g.carWidth.q, g.carHeight.q)
+                .scale(carScale)
                 .then(if (arrivalProgress == null) Modifier.enterFromBelow(48.q) else Modifier),
             if (arrivalProgress != null && arrivalProgress in 0.72f..0.998f) lamps.copy(brake = true) else lamps,
         )

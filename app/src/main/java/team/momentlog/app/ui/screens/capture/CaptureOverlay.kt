@@ -69,10 +69,20 @@ fun CaptureOverlay(
     val followUps = events.filter { it.atMillis > atMillis }
     val earlier = events.filter { it.atMillis < atMillis }
     val copy = if (followUps.isEmpty()) CaptureCopy.of(kind) else CaptureCopy.followUp(kind)
+    val carFocus = remember(atMillis) { Animatable(1f) }
+    LaunchedEffect(atMillis) {
+        if (kind == RecordKind.AFTER_STOP) {
+            carFocus.animateTo(1.016f, tween(280, easing = EaseOut))
+            carFocus.animateTo(1f, tween(620, easing = EaseOut))
+        }
+    }
 
     AppScreen(drivingAllowed = kind != RecordKind.AFTER_STOP) {
         RoadStage(
             parked = parked,
+            // 홈에서 정차한 차의 위치·차선 위상을 유지하고 저장 강조만 이어 간다.
+            arrivalProgress = if (kind == RecordKind.AFTER_STOP) 1f else null,
+            carScale = carFocus.value,
             behindCar = { g -> SavedSpan(g, tone, kind, copy, atMillis, earlier, followUps) },
             overCar = { g -> if (kind == RecordKind.IMPACT) ImpactArc(rear = true, g = g) },
         )
