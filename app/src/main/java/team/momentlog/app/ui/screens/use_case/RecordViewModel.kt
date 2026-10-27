@@ -30,6 +30,12 @@ class RecordViewModel(application: Application) : BaseViewModel(application) {
         private set
 
     fun focusRecord(id: String) { _focusedId.value = id }
+    fun resetListPosition() {
+        _focusedId.value = null
+        listIndex = 0
+        listOffset = 0
+    }
+
     fun rememberListPosition(index: Int, offset: Int) {
         listIndex = index
         listOffset = offset
