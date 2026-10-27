@@ -79,6 +79,7 @@ fun AppNavHost(navController: NavHostController, viewModels: AppViewModels) {
                 recordViewModel = viewModels.record,
                 onSendToPhone = { navController.navigate(Routes.document(recordId)) },
                 onOpenRecords = toRecords,
+                onStatement = { navController.navigate(Routes.statement(recordId)) },
             )
         }
         composable(Routes.STATEMENT, arguments = recordIdArgument) { entry ->

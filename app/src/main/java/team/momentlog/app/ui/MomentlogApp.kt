@@ -77,6 +77,7 @@ fun MomentlogApp(viewModels: AppViewModels) {
     LaunchedEffect(finishedId, isDriving, afterStopAction) {
         val done = capture ?: return@LaunchedEffect
         val id = done.recordId ?: return@LaunchedEffect
+        viewModels.record.loadRecords()
         val kind = RecordKind.of(done.trigger, done.parked)
         if (kind == RecordKind.AFTER_STOP) {
             afterStopAction?.let { action ->

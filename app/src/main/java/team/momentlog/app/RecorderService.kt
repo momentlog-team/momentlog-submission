@@ -117,9 +117,13 @@ class RecorderService : Service() {
     private fun onRecordCompleted(record: IncidentRecord) {
         val sha = RecordHasher.sha256(record)
         val parked = _capture.value?.parked == true
-        _capture.value = _capture.value?.copy(recordId = record.id)
+        val captureAtMillis = _capture.value?.atMillis
         io.launch {
             store.save(record, sha, savedWhileParked = parked)
+            // 진술 저장이 파일 생성보다 먼저 실행되지 않도록, 파일 저장 후 완료를 알린다.
+            _capture.value = _capture.value?.let { capture ->
+                if (capture.atMillis == captureAtMillis) capture.copy(recordId = record.id) else capture
+            }
             store.delete(record.mergedRecordIds)
             if (sealClient.seal(record.id, sha, record.triggerAtMillis)) store.markSealed(record.id)
             _lastSavedId.value = record.id

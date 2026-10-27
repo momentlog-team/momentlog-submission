@@ -36,7 +36,7 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
     val plate: StateFlow<String?> = _plate
 
     fun start(recordId: String) {
-        if (this.recordId == recordId) return
+        if (this.recordId == recordId && _step.value != Step.LATER) return
         this.recordId = recordId
         _step.value = Step.ASK
         clear()

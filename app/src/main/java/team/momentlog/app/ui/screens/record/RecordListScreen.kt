@@ -241,7 +241,7 @@ private fun LengthBar(record: RecordInfo, tone: Color) {
 private fun StateChips(record: RecordInfo, now: Long) {
     val colors = LocalAppColors.current
     Row(horizontalArrangement = Arrangement.spacedBy(8.q)) {
-        if (record.statementState == RecordStore.StatementState.LATER || record.statementState == RecordStore.StatementState.WRITING) {
+        if (record.needsStatement) {
             SmallChip(if (record.statementState == RecordStore.StatementState.WRITING) "진술 작성 중" else "진술 미작성", colors.warning, colors.warning.copy(alpha = 0.16f))
         }
         val days = record.daysUntilDelete(now)
@@ -293,7 +293,7 @@ private fun Preview(record: RecordInfo, now: Long, onOpen: () -> Unit, onStateme
         Column(verticalArrangement = Arrangement.spacedBy(16.q)) {
             val full = Modifier.fillMaxWidth()
             when {
-                record.needsStatement && record.statementState != RecordStore.StatementState.NONE -> {
+                record.needsStatement -> {
                     CustomButton("진술 추가", onStatement, full, primary = true, large = false, icon = AppIcon.MIC)
                     CustomButton("결과 보기", onOpen, full, large = false)
                 }

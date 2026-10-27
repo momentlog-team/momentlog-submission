@@ -1,6 +1,7 @@
 package team.momentlog.app.ui.screens.record
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -70,6 +71,7 @@ fun RecordDetailScreen(
     recordViewModel: RecordViewModel,
     onSendToPhone: () -> Unit,
     onOpenRecords: () -> Unit,
+    onStatement: () -> Unit,
 ) {
     LaunchedEffect(recordId) { recordViewModel.loadRecord(recordId) }
     val record by recordViewModel.selected.collectAsState()
@@ -80,12 +82,12 @@ fun RecordDetailScreen(
             Text("기록을 불러오고 있어요", style = textStyle(30, 42, color = LocalAppColors.current.textSecondary), modifier = Modifier.align(Alignment.Center))
             return@AppScreen
         }
-        if (isSplit) ResultSplit(current, onSendToPhone) else ResultFull(current, onSendToPhone, onOpenRecords)
+        if (isSplit) ResultSplit(current, onSendToPhone, onStatement) else ResultFull(current, onSendToPhone, onOpenRecords, onStatement)
     }
 }
 
 @Composable
-private fun BoxScope.ResultFull(record: RecordInfo, onSendToPhone: () -> Unit, onOpenRecords: () -> Unit) {
+private fun BoxScope.ResultFull(record: RecordInfo, onSendToPhone: () -> Unit, onOpenRecords: () -> Unit, onStatement: () -> Unit) {
     val colors = LocalAppColors.current
     val tone = record.kind.tone(colors)
 
@@ -128,12 +130,12 @@ private fun BoxScope.ResultFull(record: RecordInfo, onSendToPhone: () -> Unit, o
             Text(Formats.clock(record.triggeredAtMillis), style = textStyle(48, 56, FontWeight.ExtraBold).copy(fontFeatureSettings = "tnum"))
             Text(Formats.date(record.triggeredAtMillis), style = textStyle(22, 28, color = colors.textSecondary))
         }
-        Column(Modifier.weight(1.3f)) { StatementBlock(record, 26, 38, plateHeight = 56, plateFont = 30) }
+        Column(Modifier.weight(1.3f)) { StatementBlock(record, 26, 38, plateHeight = 56, plateFont = 30, onStatement = onStatement) }
     }
 }
 
 @Composable
-private fun ResultSplit(record: RecordInfo, onSendToPhone: () -> Unit) {
+private fun ResultSplit(record: RecordInfo, onSendToPhone: () -> Unit, onStatement: () -> Unit) {
     val colors = LocalAppColors.current
     val tone = record.kind.tone(colors)
     Box(Modifier.fillMaxSize()) {
@@ -154,7 +156,7 @@ private fun ResultSplit(record: RecordInfo, onSendToPhone: () -> Unit) {
         Column(Modifier.padding(start = 40.q, end = 40.q, top = 966.q)) {
             Text(Formats.clock(record.triggeredAtMillis), style = textStyle(40, 48, FontWeight.ExtraBold).copy(fontFeatureSettings = "tnum"))
             Spacer(Modifier.height(8.q))
-            StatementBlock(record, 22, 32, plateHeight = 48, plateFont = 26)
+            StatementBlock(record, 22, 32, plateHeight = 48, plateFont = 26, onStatement = onStatement)
         }
     }
 }
@@ -231,9 +233,19 @@ private fun MomentNumbers(record: RecordInfo, modifier: Modifier) {
 }
 
 @Composable
-private fun StatementBlock(record: RecordInfo, size: Int, lineHeight: Int, plateHeight: Int, plateFont: Int) {
+private fun StatementBlock(record: RecordInfo, size: Int, lineHeight: Int, plateHeight: Int, plateFont: Int, onStatement: () -> Unit) {
     val colors = LocalAppColors.current
-    Text("진술 · 운전자", style = textStyle(20, 26, FontWeight.Bold, colors.textTertiary))
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("진술 · 운전자", style = textStyle(20, 26, FontWeight.Bold, colors.textTertiary))
+        if (record.needsStatement) {
+            Spacer(Modifier.width(20.q))
+            Text(
+                "진술 남기기",
+                style = textStyle(24, 32, FontWeight.Bold, colors.accent),
+                modifier = Modifier.clickable(onClick = onStatement).padding(8.q),
+            )
+        }
+    }
     val statement = record.statement?.takeIf { it.isNotBlank() }
     Text(
         statement?.let { "“$it”" } ?: "아직 진술을 남기지 않았어요",
