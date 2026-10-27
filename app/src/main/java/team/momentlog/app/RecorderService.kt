@@ -23,6 +23,7 @@ import team.momentlog.app.record.SealClient
 import team.momentlog.app.signal.VehicleSignalClient
 import team.momentlog.app.signal.ReplaySource
 import team.momentlog.app.signal.SignalSource
+import team.momentlog.app.voice.GleoRecordAction
 import team.momentlog.core.CaptureWindow
 import team.momentlog.core.IncidentEvent
 import team.momentlog.core.IncidentRecord
@@ -36,7 +37,7 @@ import team.momentlog.core.Trigger
  * 화면이 가려져도 최근 3분을 계속 들고 있는 포그라운드 서비스.
  * 100ms마다 현재 신호 상태를 스냅샷으로 찍어 [IncidentRecorder]에 넣고, 기록이 완성되면 저장·봉인한다.
  *
- * TODO(앱): 정차 후 음성 진술(TTS 질문 → STT), "기록해" 음성 트리거, CarUxRestrictions 대응.
+ * 음성 비서의 기록 요청도 UI 버튼과 같은 경로로 처리한다.
  */
 class RecorderService : Service() {
 
@@ -68,9 +69,25 @@ class RecorderService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.getBooleanExtra(GleoRecordAction.EXTRA_FROM_GLEO, false) == true && !GleoRecordAction.ENABLED) {
+            if (source == null) stopSelf(startId)
+            return START_NOT_STICKY
+        }
+        return try {
+            handleStartCommand(intent)
+        } catch (error: Exception) {
+            if (intent?.getBooleanExtra(GleoRecordAction.EXTRA_FROM_GLEO, false) != true) throw error
+            GleoRecordAction.respond(this, success = false,
+                message = "Recording could not be initialized. Open Momentlog and check the recording permissions.")
+            stopSelf(startId)
+            START_NOT_STICKY
+        }
+    }
+
+    private fun handleStartCommand(intent: Intent?): Int {
         val recordNowRequested = intent?.action == ACTION_RECORD_NOW
         if (recordNowRequested && source != null) {
-            recordNow()
+            recordRequested(intent, hasRecentBuffer = true)
             return START_STICKY
         }
         val replay = intent?.getBooleanExtra(EXTRA_REPLAY, false) == true
@@ -85,11 +102,28 @@ class RecorderService : Service() {
         handler.removeCallbacks(tick)
         handler.post(tick)
         // 꺼져 있을 때 "기록해"가 오면 켜자마자 기록한다(버퍼가 비어 있어 직전 기록은 없다).
-        if (recordNowRequested) recordNow()
+        if (recordNowRequested) recordRequested(intent, hasRecentBuffer = false)
         return START_STICKY
     }
 
     private fun recordNow() = trigger(Trigger.VOICE)
+
+    private fun recordRequested(intent: Intent?, hasRecentBuffer: Boolean) {
+        val fromGleo = intent?.getBooleanExtra(GleoRecordAction.EXTRA_FROM_GLEO, false) == true
+        try {
+            recordNow()
+            if (fromGleo) {
+                GleoRecordAction.respond(this, success = true, message = if (hasRecentBuffer) {
+                    "The capture request has been accepted. Available recent vehicle signals will be included, and the record will be saved when capture finishes."
+                } else {
+                    "Recording has just started and the capture request has been accepted. Earlier vehicle signals are unavailable."
+                })
+            }
+        } catch (error: Exception) {
+            if (!fromGleo) throw error
+            GleoRecordAction.respond(this, success = false, message = "The capture request could not be processed. Please try again.")
+        }
+    }
 
     /** 정차 중 "기록해"는 뒤 구간 없이 바로 저장한다. */
     private fun trigger(trigger: Trigger) {
@@ -193,8 +227,9 @@ class RecorderService : Service() {
             _capture.value = null
         }
 
-        fun recordNow(context: Context) {
-            context.startForegroundService(Intent(context, RecorderService::class.java).setAction(ACTION_RECORD_NOW))
+        fun recordNow(context: Context, fromGleo: Boolean = false) {
+            context.startForegroundService(Intent(context, RecorderService::class.java).setAction(ACTION_RECORD_NOW)
+                .putExtra(GleoRecordAction.EXTRA_FROM_GLEO, fromGleo))
         }
 
         fun start(context: Context, replay: Boolean) {

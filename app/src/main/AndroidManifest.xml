@@ -49,6 +49,13 @@
             </intent-filter>
         </activity>
 
+        <!-- 공모전 Gleo 승인 지원 확인 전까지 비활성화한다. -->
+        <receiver android:name=".voice.GleoRecordReceiver" android:enabled="false" android:exported="false">
+            <intent-filter>
+                <action android:name="SAVE_RECENT_DRIVE" />
+            </intent-filter>
+        </receiver>
+
         <!-- 화면이 가려져도 최근 3분 기록을 계속 들고 있는 서비스 -->
         <service
             android:name=".RecorderService"

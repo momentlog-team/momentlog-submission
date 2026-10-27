@@ -125,7 +125,6 @@ private fun HomeContent(parked: Boolean, unsupported: List<String>, onRecordNow:
                 .enterFromBelow(16.q, 80),
             verticalArrangement = Arrangement.spacedBy(32.q),
         ) {
-            VoiceHint("“기록해”", "라고 말하면 바로 저장해요")
             val buttonModifier = if (split) Modifier.fillMaxWidth() else Modifier
             if (parked) {
                 CustomButton("방금 일 기록", onRecordNow, buttonModifier, primary = true, icon = AppIcon.REC)
