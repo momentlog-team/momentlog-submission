@@ -41,9 +41,17 @@
 | 항목 | 값 |
 |---|---|
 | 에뮬레이터 | Pleos Connect Emulator v2.1.0, API 34, x86_64, RAM 4GB |
-| SDK | Vehicle 2.3.2 (NaviHelper 3.0.5, TTS/STT 3.3.1, FusedLocation 1.1.3은 2단계) |
+| SDK | Vehicle 2.3.2, SpeechToText 3.3.1 (NaviHelper, FusedLocation은 미연결) |
 | JDK | 17 |
 | 빌드 | Gradle 8.14.3, AGP 8.8.2, Kotlin 2.0.21 |
+
+## 음성 진술
+
+정차 중 기록의 **진술 추가 → 말하기**에서 마이크 권한을 허용한다. 한국어 인식 중에는 임시 문장을 표시하고, 최종 결과 또는 **다 말했어요** 뒤 확인 화면에서 저장한다. 원본 음성 파일은 앱에 저장하지 않는다. 번호판은 인식된 텍스트가 숫자·한글 번호판 형식일 때만 추출하므로 확인이 필요하다.
+
+음성인식은 [Pleos SpeechToText 3.3.1 공식 SDK](https://document.pleos.ai/en/docs/pleos-only/connect-sdk-pleos/SpeechToText/importing-sdk)의 `ON_DEVICE` 모드를 먼저 시도한다. 초기화 실패·준비 시간 초과 시 [Android SpeechRecognizer](https://developer.android.com/reference/android/speech/SpeechRecognizer)로 전환한다. 표준 서비스의 네트워크 사용 여부는 기기에 설치된 인식 엔진에 따라 달라진다. 음성 안내는 Android `TextToSpeech`를 통해 설치된 한국어 엔진을 사용한다. SDK는 공식 Pleos Maven 배포본을 사용하며 Pleos SDK 이용 조건을 따른다.
+
+기기에 엔진·한국어 모델이 없거나 응답이 오지 않으면 오류를 표시한다. 화면을 벗어나거나 앱이 백그라운드로 가면 마이크를 종료하며, 주행 재개 시 받아 적은 내용은 작성 중 상태로 보관한다. 상시 음성 명령 감지는 포함하지 않는다.
 
 ## APK
 

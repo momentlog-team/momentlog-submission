@@ -1,5 +1,16 @@
 package team.momentlog.app.ui.screens.statement
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+
 import androidx.compose.animation.core.InfiniteRepeatableSpec
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -76,6 +87,33 @@ fun StatementScreen(
     val transcript by statementViewModel.transcript.collectAsState()
     val partial by statementViewModel.partial.collectAsState()
     val plate by statementViewModel.plate.collectAsState()
+    val session by statementViewModel.session.collectAsState()
+    val voiceError by statementViewModel.voiceError.collectAsState()
+    val ready by statementViewModel.ready.collectAsState()
+    val level by statementViewModel.level.collectAsState()
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val microphonePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) statementViewModel.beginRecognition()
+        else if (statementViewModel.step.value == Step.LISTENING) statementViewModel.recognitionFailed("마이크 권한을 허용해야 받아쓸 수 있어요. 말하기를 눌러 다시 시도해 주세요.")
+    }
+    LaunchedEffect(step, session) {
+        if (step == Step.LISTENING) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                statementViewModel.beginRecognition()
+            } else microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+        } else if (step == Step.ASK && voiceError == null) statementViewModel.prompt()
+    }
+    DisposableEffect(lifecycleOwner, recordId) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) statementViewModel.leaveScreen()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            statementViewModel.leaveScreen()
+        }
+    }
     val colors = LocalAppColors.current
     val split = isSplit
     val kind = record?.kind ?: RecordKind.HARD_STOP
@@ -115,9 +153,13 @@ fun StatementScreen(
         ) {
             when (step) {
                 Step.ASK -> Ask()
-                Step.LISTENING -> Listening(transcript, partial)
+                Step.LISTENING -> Listening(transcript, partial, ready, level)
                 Step.CONFIRM -> Confirm(transcript, plate)
                 Step.LATER -> Later()
+            }
+            voiceError?.let {
+                Spacer(Modifier.height(24.q))
+                Text(it, style = textStyle(24, 34, color = colors.warning))
             }
         }
 
@@ -179,7 +221,7 @@ private fun ColumnScope.Ask() {
     }
     Spacer(Modifier.height(48.q))
     StatementReveal(420) {
-        VoiceHint(null, "지금 말씀하시거나 “나중에”라고 하세요")
+        VoiceHint(null, "말하기를 누르고 상황을 말씀해 주세요")
     }
 }
 
@@ -200,9 +242,9 @@ private fun StatementReveal(delayMillis: Int, animationKey: Any? = Unit, content
 }
 
 @Composable
-private fun ColumnScope.Listening(transcript: String, partial: String) {
+private fun ColumnScope.Listening(transcript: String, partial: String, ready: Boolean, level: Float) {
     val colors = LocalAppColors.current
-    StatusChip("듣고 있어요", colors.accent, icon = AppIcon.MIC)
+    StatusChip(if (ready) "듣고 있어요" else "마이크 준비 중", colors.accent, icon = AppIcon.MIC)
     Spacer(Modifier.height(32.q))
     val cursorAlpha by rememberInfiniteTransition(label = "cursor")
         .animateFloat(1f, 0f, InfiniteRepeatableSpec(tween(500), RepeatMode.Reverse), label = "cursorAlpha")
@@ -219,20 +261,20 @@ private fun ColumnScope.Listening(transcript: String, partial: String) {
         Box(Modifier.padding(start = 6.q, bottom = 6.q).size(4.q, 44.q).background(colors.accent.copy(alpha = cursorAlpha)))
     }
     Spacer(Modifier.height(40.q))
-    SoundBars()
+    SoundBars(if (ready) level else 0f)
     Spacer(Modifier.height(40.q))
     VoiceHint(null, "상대 차 번호도 말씀해 주세요")
 }
 
 /** 소리 막대. 반복 모션은 정차 중 화면에만 쓴다. */
 @Composable
-private fun SoundBars() {
+private fun SoundBars(inputLevel: Float) {
     val colors = LocalAppColors.current
-    val transition = rememberInfiniteTransition(label = "bars")
     Row(Modifier.height(96.q), horizontalArrangement = Arrangement.spacedBy(10.q), verticalAlignment = Alignment.CenterVertically) {
         repeat(14) { i ->
-            val duration = 800 + (i * 137) % 500
-            val level by transition.animateFloat(0.18f, 1f, InfiniteRepeatableSpec(tween(duration), RepeatMode.Reverse), label = "bar$i")
+            val level by androidx.compose.animation.core.animateFloatAsState(
+                (0.12f + inputLevel * (0.45f + ((i * 7) % 11) / 20f)).coerceIn(0.12f, 1f), tween(100), label = "bar$i",
+            )
             Box(Modifier.width(12.q).fillMaxHeight(level).background(colors.accent, RoundedCornerShape(6.q)))
         }
     }
