@@ -1,6 +1,7 @@
 package team.momentlog.app.ui.models
 
 import kotlin.math.tan
+import kotlin.math.tanh
 
 data class PlaybackMotion(val distanceMeters: Float, val headingDegrees: Float)
 
@@ -18,5 +19,6 @@ fun RecordInfo.motionAt(playhead: Long, start: Long): PlaybackMotion {
         val wheel = Math.toRadians((s.steeringDeg ?: 0f).coerceIn(-540f, 540f) / 15.0)
         heading += Math.toDegrees(meters / 2.8 * tan(wheel))
     }
-    return PlaybackMotion(distance.toFloat(), heading.toFloat().coerceIn(-22f, 22f))
+    // 최대 회전각에 닿을 때도 갑자기 멈추지 않도록 완만하게 수렴시킨다.
+    return PlaybackMotion(distance.toFloat(), (22.0 * tanh(heading / 22.0)).toFloat())
 }

@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +15,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.StrokeCap
@@ -33,9 +35,10 @@ fun DrivingPlaybackCar(record: RecordInfo, snapshot: Snapshot?, playhead: Long, 
     val colors = LocalAppColors.current
     val start = maxOf(record.startMillis, record.triggeredAtMillis - 10_000)
     val motion = record.motionAt(playhead, start)
-    val speed by animateFloatAsState(snapshot?.speedKph ?: 0f, tween(140), label = "driveSpeed")
-    val steering by animateFloatAsState(snapshot?.steeringDeg ?: 0f, tween(140), label = "driveSteering")
-    val heading by animateFloatAsState(motion.headingDegrees, tween(160), label = "driveHeading")
+    // 감쇠 스프링은 신호가 갱신되어도 이전 프레임의 속도를 이어 받아 움직인다.
+    val speed by animateFloatAsState(snapshot?.speedKph ?: 0f, spring(dampingRatio = 1f, stiffness = 350f), label = "driveSpeed")
+    val steering by animateFloatAsState(snapshot?.steeringDeg ?: 0f, spring(dampingRatio = 1f, stiffness = 280f), label = "driveSteering")
+    val heading by animateFloatAsState(motion.headingDegrees, spring(dampingRatio = 1f, stiffness = 240f), label = "driveHeading")
     val brake by animateFloatAsState(if (snapshot?.brake == true) 1f else 0f, tween(180), label = "brakeLight")
     val turn = snapshot?.turn
     val turnOn = turn == TurnSignal.LEFT || turn == TurnSignal.RIGHT
@@ -60,22 +63,26 @@ fun DrivingPlaybackCar(record: RecordInfo, snapshot: Snapshot?, playhead: Long, 
     Box(modifier) {
         Canvas(Modifier.fillMaxSize().graphicsLayer { scaleX = 1.65f; scaleY = 1.12f }.clipToBounds()) {
             val u = size.width / 200f
-            val phase = (motion.distanceMeters * 11f) % 100f
-            val visibility = (speed / 65f).coerceIn(0.3f, 0.7f)
+            val phase = (motion.distanceMeters * 11f) % 88f
             val road = colors.road
-            drawRect(Brush.verticalGradient(0f to road.copy(alpha = 0f), 0.16f to road.copy(alpha = 0.72f), 0.84f to road.copy(alpha = 0.72f), 1f to road.copy(alpha = 0f)))
-            val edge = Brush.verticalGradient(0f to colors.roadMark.copy(alpha = 0f), 0.2f to colors.roadMark.copy(alpha = 0.4f), 0.8f to colors.roadMark.copy(alpha = 0.4f), 1f to colors.roadMark.copy(alpha = 0f))
-            for (x in listOf(4f, 196f)) drawLine(edge, Offset(x * u, 0f), Offset(x * u, size.height), 1.2f * u)
-            for (x in listOf(18f, 182f)) {
-                for (i in -2..6) {
-                    val y = (i * 100 + phase) * u
-                    drawLine(colors.roadMark.copy(alpha = visibility), Offset(x * u, y), Offset(x * u, y + 42 * u), 2 * u, StrokeCap.Round)
-                }
+            fun faded(color: androidx.compose.ui.graphics.Color, alpha: Float) = Brush.verticalGradient(
+                0f to color.copy(alpha = 0f), 0.18f to color.copy(alpha = alpha),
+                0.78f to color.copy(alpha = alpha), 1f to color.copy(alpha = 0f),
+            )
+            // 중앙 차로와 양쪽 갓길을 낮은 대비로 분리한다. 모든 표식은 화면 끝에서 서서히 사라진다.
+            drawRect(faded(road, 0.8f))
+            for (x in listOf(0f, 186f)) {
+                drawRect(faded(colors.roadMark, 0.035f), Offset(x * u, 0f), Size(14 * u, size.height))
             }
-            if (speed > 1f) {
-                for (x in listOf(22f, 178f)) {
-                    val length = (speed / 65f).coerceIn(0f, 1f) * 90 * u
-                    drawLine(colors.accent.copy(alpha = 0.12f), Offset(x * u, size.height * 0.6f), Offset(x * u, size.height * 0.6f + length), 4 * u, StrokeCap.Round)
+            for (x in listOf(14f, 186f)) {
+                drawLine(faded(colors.roadMark, 0.28f), Offset(x * u, 0f), Offset(x * u, size.height), 0.8f * u)
+                val inset = if (x < 100) x + 3f else x - 3f
+                drawLine(faded(colors.roadMark, 0.07f), Offset(inset * u, 0f), Offset(inset * u, size.height), 0.6f * u)
+            }
+            for (x in listOf(42f, 158f)) {
+                for (i in -1..(size.height / (88 * u)).toInt() + 1) {
+                    val y = (i * 88 + phase) * u
+                    drawLine(faded(colors.roadMark, 0.4f), Offset(x * u, y), Offset(x * u, y + 30 * u), 1.6f * u, StrokeCap.Butt)
                 }
             }
         }
