@@ -21,6 +21,18 @@ class RecordViewModel(application: Application) : BaseViewModel(application) {
 
     private val _selected = MutableStateFlow<RecordInfo?>(null)
     val selected: StateFlow<RecordInfo?> = _selected
+    private val _focusedId = MutableStateFlow<String?>(null)
+    val focusedId: StateFlow<String?> = _focusedId
+    var listIndex: Int = 0
+        private set
+    var listOffset: Int = 0
+        private set
+
+    fun focusRecord(id: String) { _focusedId.value = id }
+    fun rememberListPosition(index: Int, offset: Int) {
+        listIndex = index
+        listOffset = offset
+    }
 
     init {
         viewModelScope.launch {
@@ -37,6 +49,7 @@ class RecordViewModel(application: Application) : BaseViewModel(application) {
     }
 
     fun loadRecord(recordId: String) {
+        focusRecord(recordId)
         viewModelScope.launch {
             _selected.value = withLoading {
                 recordRepository.getRecord(recordId)?.let { RecordInfo.from(it, narrator) }

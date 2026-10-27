@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -30,9 +32,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -86,7 +85,12 @@ fun RecordListScreen(
 ) {
     LaunchedEffect(Unit) { recordViewModel.loadRecords() }
     val records by recordViewModel.records.collectAsState()
-    var selectedId by remember { mutableStateOf<String?>(null) }
+    val selectedId by recordViewModel.focusedId.collectAsState()
+    val listState = rememberLazyListState(recordViewModel.listIndex, recordViewModel.listOffset)
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { (index, offset) -> recordViewModel.rememberListPosition(index, offset) }
+    }
     val selected = records.firstOrNull { it.id == selectedId } ?: records.firstOrNull()
     val split = isSplit
     val colors = LocalAppColors.current
@@ -123,13 +127,13 @@ fun RecordListScreen(
             if (records.isEmpty()) {
                 EmptyRecords(Modifier.fillMaxSize())
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.q)) {
+                LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(8.q)) {
                     itemsIndexed(records, key = { _, r -> r.id }) { index, record ->
                         RecordRow(
                             record, now,
-                            selected = !split && record.id == selected?.id,
+                            selected = record.id == selected?.id,
                             stackChips = split,
-                            onClick = { if (split) onOpen(record) else selectedId = record.id },
+                            onClick = { recordViewModel.focusRecord(record.id); if (split) onOpen(record) },
                             modifier = Modifier.enterFromBelow(12.q, delayMillis = index * 50),
                         )
                     }
@@ -340,7 +344,8 @@ private fun listTitle(record: RecordInfo): String {
         f.turnSecondsBefore != null -> "$anchor ${secondsText(f.turnSecondsBefore)} 전부터 ${turnSideText(f.turn)} 방향지시등 켜짐"
         f.brakeSecondsBefore != null && f.brakeStartSpeed != null && f.speedAtTrigger != null ->
             "$anchor ${secondsText(f.brakeSecondsBefore)} 전, ${f.brakeStartSpeed.roundToInt()}→${f.speedAtTrigger.roundToInt()}km/h 급제동"
-        f.speedAtTrigger != null -> "$anchor 때 ${f.speedAtTrigger.roundToInt()}km/h, 핸들 ${steeringText(f.steeringAtTrigger)}"
+        f.speedAtTrigger != null -> "$anchor 때 ${f.speedAtTrigger.roundToInt()}km/h, " +
+            if (f.steeringAtTrigger == null) "핸들 정보 없음" else "핸들 ${steeringText(f.steeringAtTrigger)}"
         record.kind == RecordKind.HARD_STOP -> "급정지만 감지됐어요"
         else -> "${record.kind.label} 기록"
     }

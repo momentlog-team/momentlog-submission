@@ -58,9 +58,11 @@ fun AppNavHost(navController: NavHostController, viewModels: AppViewModels) {
     val recordIdArgument = listOf(navArgument(Routes.ARG_RECORD_ID) { type = NavType.StringType })
     val toHome: () -> Unit = { navController.navigate(Routes.HOME) { popUpTo(Routes.HOME) { inclusive = true } } }
     val toRecords: () -> Unit = {
-        navController.navigate(Routes.RECORDS) {
-            popUpTo(Routes.HOME)
-            launchSingleTop = true
+        if (!navController.popBackStack(Routes.RECORDS, false)) {
+            navController.navigate(Routes.RECORDS) {
+                popUpTo(Routes.HOME)
+                launchSingleTop = true
+            }
         }
     }
 
