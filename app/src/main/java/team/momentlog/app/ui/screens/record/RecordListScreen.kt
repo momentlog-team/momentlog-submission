@@ -240,7 +240,7 @@ private fun LengthBar(record: RecordInfo, tone: Color) {
 @Composable
 private fun StateChips(record: RecordInfo, now: Long) {
     val colors = LocalAppColors.current
-    Row(horizontalArrangement = Arrangement.spacedBy(8.q)) {
+    val chips: @Composable () -> Unit = {
         if (record.needsStatement) {
             SmallChip(if (record.statementState == RecordStore.StatementState.WRITING) "진술 작성 중" else "진술 미작성", colors.warning, colors.warning.copy(alpha = 0.16f))
         }
@@ -250,6 +250,14 @@ private fun StateChips(record: RecordInfo, now: Long) {
         } else {
             SmallChip("${days}일 뒤 삭제", colors.textSecondary, Color.Transparent, AppIcon.CLOCK, dashed = true)
         }
+    }
+    if (isSplit) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.q)) { chips() }
+    } else {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.q),
+            horizontalAlignment = Alignment.End,
+        ) { chips() }
     }
 }
 
