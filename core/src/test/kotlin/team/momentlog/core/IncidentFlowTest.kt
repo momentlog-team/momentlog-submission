@@ -77,14 +77,85 @@ class IncidentFlowTest {
         assertFalse(recorder.isCapturing)
     }
 
+    /** 일정 속도로 달리는 스냅샷을 100ms 간격으로 넣고, 완성된 기록이 있으면 모아 돌려준다. */
+    private fun IncidentRecorder.drive(range: LongRange, speed: (Long) -> Float = { 50f }): List<IncidentRecord> =
+        range.step(100).mapNotNull { t -> onSnapshot(Snapshot(t, speedKph = speed(t))) }
+
     @Test
-    fun `음성 요청으로도 기록을 만들 수 있다`() {
+    fun `기록해는 직전 3분과 말한 뒤 30초를 남긴다`() {
         val recorder = IncidentRecorder(newId = { "voice-1" })
-        (0L..20_000L step 100).forEach { recorder.onSnapshot(Snapshot(it, speedKph = 50f)) }
-        recorder.trigger(Trigger.VOICE, 20_000)
-        var record: IncidentRecord? = null
-        (20_100L..31_000L step 100).forEach { t -> recorder.onSnapshot(Snapshot(t, speedKph = 50f))?.let { record = it } }
-        assertEquals(Trigger.VOICE, assertNotNull(record).trigger)
+        recorder.drive(0L..300_000L)
+        recorder.trigger(Trigger.VOICE, 300_000)
+        assertTrue(recorder.drive(300_100L..329_900L).isEmpty(), "30초가 지나기 전에는 완성되지 않는다")
+        val r = recorder.drive(330_000L..330_000L).single()
+
+        assertEquals(Trigger.VOICE, r.trigger)
+        assertEquals(120_000, r.snapshots.first().atMillis)
+        assertEquals(330_000, r.snapshots.last().atMillis)
+    }
+
+    @Test
+    fun `정차 중 사후 저장은 직전 3분만 바로 남긴다`() {
+        val recorder = IncidentRecorder(newId = { "after-1" })
+        recorder.drive(0L..200_000L) { 0f }
+        recorder.trigger(Trigger.VOICE, 200_000, postMillis = 0)
+        val r = recorder.drive(200_100L..200_100L).single()
+        assertEquals(20_000, r.snapshots.first().atMillis)
+        assertTrue(r.snapshots.last().atMillis <= 200_100)
+    }
+
+    @Test
+    fun `저장 중 다시 급정지하면 같은 기록에 이어 붙이고 멈춘 뒤 10초까지 남긴다`() {
+        val recorder = IncidentRecorder(newId = { "follow-1" })
+        recorder.drive(0L..40_000L)
+        recorder.trigger(Trigger.AIRBAG, 40_000)
+        // 충격 뒤에도 계속 달리다가 +12초에 50 → 20km/h 급정지, 3초 동안 천천히 서서 55초에 정지
+        val records = recorder.drive(40_100L..90_000L) { t ->
+            when {
+                t < 52_000 -> 50f
+                t < 55_000 -> 20f - (t - 52_000) / 3_000f * 20f
+                else -> 0f
+            }
+        }
+
+        val r = records.single()
+        assertEquals(listOf(Trigger.AIRBAG, Trigger.HARD_STOP), r.events.map { it.trigger })
+        assertEquals(52_000, r.events[1].atMillis)
+        assertEquals(64_900, r.snapshots.last().atMillis, "1km/h 미만이 된 54.9초를 멈춘 시점으로 보고 10초 뒤까지 남긴다")
+    }
+
+    @Test
+    fun `멈추지 않으면 감지 뒤 60초에서 끝낸다`() {
+        val recorder = IncidentRecorder(newId = { "nostop-1" })
+        recorder.drive(0L..40_000L)
+        recorder.trigger(Trigger.AIRBAG, 40_000)
+        val r = recorder.drive(40_100L..120_000L).single()
+        assertEquals(100_000, r.snapshots.last().atMillis)
+    }
+
+    @Test
+    fun `기록해 직전 3분 안의 급정지 기록은 합친다`() {
+        var n = 0
+        val recorder = IncidentRecorder(newId = { "r-${++n}" })
+        val first = recorder.drive(0L..70_000L) { t -> if (t >= 40_000) 0f else 50f }.single()
+        assertEquals(Trigger.HARD_STOP, first.trigger)
+
+        recorder.drive(70_100L..132_000L) { 0f }
+        recorder.trigger(Trigger.VOICE, 132_000)
+        val merged = recorder.drive(132_100L..162_000L) { 0f }.single()
+
+        assertEquals(listOf("r-1"), merged.mergedRecordIds)
+        assertEquals(listOf(Trigger.HARD_STOP, Trigger.VOICE), merged.events.map { it.trigger })
+        assertTrue(merged.snapshots.first().atMillis <= 40_000, "합친 급정지 시점이 기록 안에 있다")
+        val lines = IncidentNarrator().narrate(merged)
+        assertTrue(lines.any { it.contains("−1분 32초 급정지") && it.contains("합쳤습니다") }, lines.toString())
+    }
+
+    @Test
+    fun `경위 첫 문장은 실제로 담긴 구간을 적는다`() {
+        val snaps = (120_000L..330_000L step 1_000).map { Snapshot(it, speedKph = 50f) }
+        val lines = IncidentNarrator().narrate(IncidentRecord("v-2", Trigger.VOICE, 300_000, snaps))
+        assertEquals("운전자 요청으로 직전 3분과 직후 30초의 차량 기록을 저장했습니다.", lines.first())
     }
 
     @Test
@@ -133,5 +204,8 @@ class IncidentFlowTest {
         })
         assertNotEquals(RecordHasher.sha256(record), RecordHasher.sha256(tampered))
         assertEquals(64, RecordHasher.sha256(record).length)
+
+        val followed = record.copy(events = record.events + IncidentEvent(Trigger.HARD_STOP, 52_000))
+        assertNotEquals(RecordHasher.sha256(record), RecordHasher.sha256(followed), "이어 붙인 감지도 원본에 포함된다")
     }
 }

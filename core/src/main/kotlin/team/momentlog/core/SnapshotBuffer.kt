@@ -18,6 +18,9 @@ class SnapshotBuffer(private val windowMillis: Long = 30_000) {
     fun toList(): List<Snapshot> = items.toList()
 
     @Synchronized
+    fun latest(): Snapshot? = items.lastOrNull()
+
+    @Synchronized
     fun clear() = items.clear()
 
     val size: Int @Synchronized get() = items.size

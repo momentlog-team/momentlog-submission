@@ -11,13 +11,16 @@ import java.util.Locale
  * 이 형식을 바꾸면 기존 기록과 대조가 깨지므로 [FORMAT_VERSION]을 올린다.
  */
 object RecordHasher {
-    const val FORMAT_VERSION = 1
+    const val FORMAT_VERSION = 2
 
     fun canonical(record: IncidentRecord): String = buildString {
         append("v=").append(FORMAT_VERSION).append('\n')
         append("id=").append(record.id).append('\n')
         append("trigger=").append(record.trigger.name).append('\n')
         append("triggerAt=").append(record.triggerAtMillis).append('\n')
+        // v2: 이어 붙인 감지와 합친 앞선 기록
+        record.events.forEach { e -> append("event=").append(e.trigger.name).append('@').append(e.atMillis).append('\n') }
+        record.mergedRecordIds.forEach { append("merged=").append(it).append('\n') }
         record.snapshots.forEach { s ->
             append(s.atMillis).append('|')
                 .append(num(s.speedKph)).append('|')
