@@ -112,7 +112,7 @@ fun AppNavHost(navController: NavHostController, viewModels: AppViewModels) {
         }
         composable(Routes.DOCUMENT, arguments = recordIdArgument) { entry ->
             val recordId = entry.arguments?.getString(Routes.ARG_RECORD_ID).orEmpty()
-            DocumentScreen(recordId, viewModels.record, viewModels.document, onBack = { navController.popBackStack() })
+            DocumentScreen(recordId, viewModels.record, viewModels.document, onBack = { navController.popBackStack() }, onHome = toHome)
         }
         composable(
             Routes.MONTHLY,

@@ -40,9 +40,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -68,6 +65,7 @@ import team.momentlog.app.ui.screens.widget.icon.Icon
 import team.momentlog.app.ui.screens.widget.label.InfoNote
 import team.momentlog.app.ui.screens.widget.label.StatusChip
 import team.momentlog.app.ui.screens.widget.layout.AppScreen
+import team.momentlog.app.ui.screens.widget.layout.HomeButton
 import team.momentlog.app.ui.screens.widget.layout.SidePanel
 import team.momentlog.app.ui.screens.widget.motion.enterFromBelow
 
@@ -166,23 +164,6 @@ fun RecordListScreen(
                 modifier = Modifier.align(Alignment.TopEnd).padding(top = 44.q, end = 56.q),
             )
         }
-    }
-}
-
-@Composable
-private fun HomeButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val colors = LocalAppColors.current
-    val shape = RoundedCornerShape(20.q)
-    Box(
-        modifier
-            .size(80.q)
-            .shadow(3.q, shape)
-            .background(colors.surface, shape)
-            .semantics { contentDescription = "홈으로 이동" }
-            .clickable(role = Role.Button, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(AppIcon.HOME, 36.q, colors.textPrimary)
     }
 }
 

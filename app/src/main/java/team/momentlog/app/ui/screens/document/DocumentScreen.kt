@@ -40,6 +40,7 @@ import team.momentlog.app.ui.screens.widget.icon.AppIcon
 import team.momentlog.app.ui.screens.widget.icon.Icon
 import team.momentlog.app.ui.screens.widget.label.StatusChip
 import team.momentlog.app.ui.screens.widget.layout.AppScreen
+import team.momentlog.app.ui.screens.widget.layout.HomeButton
 import team.momentlog.app.ui.screens.widget.layout.SidePanel
 import team.momentlog.app.ui.screens.widget.motion.enterFromBelow
 import team.momentlog.app.ui.screens.widget.qr.QrCode
@@ -48,7 +49,7 @@ import team.momentlog.app.ui.screens.widget.qr.QrCode
  * 휴대폰으로 받기(QR).
  */
 @Composable
-fun DocumentScreen(recordId: String, recordViewModel: RecordViewModel, documentViewModel: DocumentViewModel, onBack: () -> Unit) {
+fun DocumentScreen(recordId: String, recordViewModel: RecordViewModel, documentViewModel: DocumentViewModel, onBack: () -> Unit, onHome: () -> Unit) {
     LaunchedEffect(recordId) { recordViewModel.loadRecord(recordId) }
     val record by recordViewModel.selected.collectAsState()
     val online by documentViewModel.online.collectAsState()
@@ -136,6 +137,10 @@ fun DocumentScreen(recordId: String, recordViewModel: RecordViewModel, documentV
                 .padding(start = if (split) 40.q else 748.q, bottom = 64.q)
                 .then(if (split) Modifier.padding(end = 40.q).fillMaxWidth() else Modifier),
             icon = AppIcon.BACK,
+        )
+        HomeButton(
+            onClick = onHome,
+            modifier = Modifier.align(Alignment.TopEnd).padding(top = 44.q, end = if (split) 40.q else 64.q),
         )
     }
 }
