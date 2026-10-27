@@ -4,6 +4,8 @@ import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import team.momentlog.app.Constant
 import team.momentlog.app.core.data.api.ApiInfo
 import team.momentlog.app.core.data.api.RecordApi
@@ -13,6 +15,9 @@ import team.momentlog.app.core.error.Either
 import team.momentlog.app.core.error.ErrorUtil
 import team.momentlog.app.core.error.Failure
 import team.momentlog.app.record.RecordStore
+import team.momentlog.app.record.MockRecords
+import team.momentlog.app.BuildConfig
+import team.momentlog.core.RecordHasher
 
 /**
  * 기록을 가져오는 진입점. 차 안 저장소([RecordStore])와 서버([RecordApi])를 합친다.
@@ -24,6 +29,18 @@ class RecordRepository(context: Context) {
 
     private val store = RecordStore(context)
     private val api: RecordApi by lazy { ApiInfo.create(RecordApi::class.java) }
+    private val mockMutex = Mutex()
+
+    suspend fun ensureMockRecords() = withContext(Dispatchers.IO) {
+        if (!BuildConfig.DEBUG) return@withContext
+        mockMutex.withLock {
+            val existing = store.list().map { it.record.id }.toSet()
+            MockRecords.create(System.currentTimeMillis()).filterNot { it.id in existing }.forEach { record ->
+                store.save(record, RecordHasher.sha256(record))
+                store.retain(record.id)
+            }
+        }
+    }
 
     /** 저장된 기록 목록. 최근 것부터. 보관 기간이 지난 기록은 먼저 지운다. */
     suspend fun getRecords(): List<RecordStore.Saved> = withContext(Dispatchers.IO) {

@@ -50,6 +50,7 @@ class DocumentViewModel(application: Application) : BaseViewModel(application) {
     fun documentUrl(record: RecordInfo): String = BuildConfig.DOCUMENT_BASE_URL + record.id
 
     fun checkSeal(record: RecordInfo) {
+        if (record.isMock) return
         _openedAtMillis.value = null
         viewModelScope.launch {
             withLoading { recordRepository.verify(record.id, record.sha256) }.fold(

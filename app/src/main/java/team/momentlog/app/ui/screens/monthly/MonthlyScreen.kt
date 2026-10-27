@@ -57,7 +57,8 @@ fun MonthlyScreen(
     onOpenRecords: () -> Unit,
 ) {
     LaunchedEffect(Unit) { recordViewModel.loadRecords() }
-    val records by recordViewModel.records.collectAsState()
+    val allRecords by recordViewModel.records.collectAsState()
+    val records = allRecords.filterNot { it.isMock }
     val unsupported by mainViewModel.unsupportedSignals.collectAsState()
     val colors = LocalAppColors.current
     val split = isSplit
