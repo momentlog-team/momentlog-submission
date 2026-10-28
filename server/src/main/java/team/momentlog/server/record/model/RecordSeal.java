@@ -19,7 +19,11 @@ public class RecordSeal {
     @Column(name = "record_id", length = 64)
     private String recordId;
 
-    @Column(name = "sha256", length = 64, nullable = false)
+    /** 보낸 기기. 기기 ID 없이 보낸 예전 앱의 봉인은 비어 있다. */
+    @Column(name = "device_id", length = 64)
+    private String deviceId;
+
+    @Column(name = "sha256", columnDefinition = "char(64)", nullable = false)
     private String sha256;
 
     @Column(name = "format_version", nullable = false)
@@ -36,16 +40,17 @@ public class RecordSeal {
     protected RecordSeal() {
     }
 
-    private RecordSeal(String recordId, String sha256, int formatVersion, Instant deviceCreatedAt, Instant sealedAt) {
+    private RecordSeal(String recordId, String deviceId, String sha256, int formatVersion, Instant deviceCreatedAt, Instant sealedAt) {
         this.recordId = recordId;
+        this.deviceId = deviceId;
         this.sha256 = sha256;
         this.formatVersion = formatVersion;
         this.deviceCreatedAt = deviceCreatedAt;
         this.sealedAt = sealedAt;
     }
 
-    public static RecordSeal seal(String recordId, String sha256, int formatVersion, Instant deviceCreatedAt, Instant now) {
-        return new RecordSeal(recordId, sha256.toLowerCase(), formatVersion, deviceCreatedAt, now);
+    public static RecordSeal seal(String recordId, String deviceId, String sha256, int formatVersion, Instant deviceCreatedAt, Instant now) {
+        return new RecordSeal(recordId, deviceId, sha256.toLowerCase(), formatVersion, deviceCreatedAt, now);
     }
 
     public boolean matches(String candidateSha256) {
@@ -54,6 +59,10 @@ public class RecordSeal {
 
     public String getRecordId() {
         return recordId;
+    }
+
+    public String getDeviceId() {
+        return deviceId;
     }
 
     public String getSha256() {

@@ -2,6 +2,7 @@ package team.momentlog.server.record.api;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
 
@@ -15,7 +16,8 @@ public final class RecordSealRequest {
     public record Seal(
             @NotBlank @Pattern(regexp = SHA256) String sha256,
             int formatVersion,
-            Instant deviceCreatedAt
+            Instant deviceCreatedAt,
+            @Size(max = 64) String deviceId
     ) {
     }
 

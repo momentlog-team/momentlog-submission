@@ -1,0 +1,14 @@
+# 로컬 MySQL. DB와 계정은 server/db/local/00_create_database.sql, 테이블은 01_schema.sql로 만든다.
+# 실행: ./gradlew :server:bootRun --args='--spring.profiles.active=mysql'
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/momentlog?serverTimezone=UTC&characterEncoding=UTF-8}
+    username: ${DB_USERNAME:momentlog}
+    password: ${DB_PASSWORD:momentlog-local}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC

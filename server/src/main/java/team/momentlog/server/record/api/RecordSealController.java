@@ -31,11 +31,11 @@ public class RecordSealController {
 
     /** 차량 앱이 기록 저장 직후 원본 해시를 봉인한다. */
     @Operation(summary = "원본 해시 봉인",
-            description = "차량 앱이 기록 저장 직후 호출. 해시와 서버 시각을 고정한다. 같은 해시 재전송은 처음 봉인을 돌려주고, 다른 해시는 409.")
+            description = "차량 앱이 기록 저장 직후 호출. 해시와 서버 시각을 고정하고, deviceId가 있으면 기기를 등록·갱신한다. 같은 해시 재전송은 처음 봉인을 돌려주고, 다른 해시는 409.")
     @PostMapping("/{recordId}/seal")
     public RecordSealResponse.SealDetail seal(@PathVariable String recordId,
                                               @Valid @RequestBody RecordSealRequest.Seal request) {
-        RecordSeal seal = recordSealService.seal(recordId, request.sha256(), request.formatVersion(), request.deviceCreatedAt());
+        RecordSeal seal = recordSealService.seal(recordId, request.deviceId(), request.sha256(), request.formatVersion(), request.deviceCreatedAt());
         return RecordSealResponse.SealDetail.from(seal);
     }
 
