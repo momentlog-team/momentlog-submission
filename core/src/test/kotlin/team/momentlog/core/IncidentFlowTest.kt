@@ -208,4 +208,20 @@ class IncidentFlowTest {
         val followed = record.copy(events = record.events + IncidentEvent(Trigger.HARD_STOP, 52_000))
         assertNotEquals(RecordHasher.sha256(record), RecordHasher.sha256(followed), "이어 붙인 감지도 원본에 포함된다")
     }
+
+    @Test
+    fun `원본 문자열을 되돌린 기록은 같은 원본과 해시를 만든다`() {
+        val record = IncidentRecord(
+            "p-1", Trigger.VOICE, 40_000,
+            intersectionScenario().map { it.copy(latitude = 37.5045, longitude = 127.0488) },
+            events = listOf(IncidentEvent(Trigger.HARD_STOP, 31_000), IncidentEvent(Trigger.VOICE, 40_000)),
+            mergedRecordIds = listOf("old-1"),
+        )
+        val canonical = RecordHasher.canonical(record)
+        val parsed = RecordHasher.parse(canonical)
+
+        assertEquals(canonical, RecordHasher.canonical(parsed))
+        assertEquals(RecordHasher.sha256(record), RecordHasher.sha256(parsed))
+        assertEquals(IncidentNarrator().narrate(record), IncidentNarrator().narrate(parsed))
+    }
 }
