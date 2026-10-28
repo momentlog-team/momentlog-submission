@@ -66,6 +66,14 @@
 - [`docs/demo-scenario.md`](docs/demo-scenario.md): 1분 시연 흐름
 - [`CONTRIBUTING.md`](CONTRIBUTING.md): 커밋·브랜치 규칙
 
+## 사용한 외부 자료
+
+| 이름 | 쓰는 곳 | 라이선스 | 출처 |
+|---|---|---|---|
+| Apache PDFBox 3.0.3 | `server` 사고 정리 PDF 생성 | Apache 2.0 | pdfbox.apache.org |
+| ZXing core 3.5.3 | `app` 문서 전달 QR, `server` PDF 원본 확인 QR | Apache 2.0 | github.com/zxing/zxing |
+| 나눔고딕 (Regular·Bold·ExtraBold) | `server` PDF 한글 글꼴 (`server/src/main/resources/fonts`, 라이선스 `OFL.txt` 동봉) | SIL OFL 1.1 | github.com/google/fonts `ofl/nanumgothic` |
+
 ## 제출 전 주의
 
 - 블라인드 심사: 저장소, README, 영상, APK 이름, 커밋 작성자에 실명·연락처가 나오면 안 된다. 제출 전에 팀 이름 Organization으로 저장소를 옮긴다.

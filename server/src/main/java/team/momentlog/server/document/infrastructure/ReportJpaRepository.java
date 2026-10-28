@@ -8,4 +8,6 @@ import java.util.Optional;
 public interface ReportJpaRepository extends JpaRepository<Report, String> {
 
     Optional<Report> findByDocumentNo(String documentNo);
+
+    Optional<Report> findFirstByRecordId(String recordId);
 }

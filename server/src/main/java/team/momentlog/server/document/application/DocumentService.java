@@ -3,6 +3,7 @@ package team.momentlog.server.document.application;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import team.momentlog.core.RecordHasher;
 import team.momentlog.server.document.infrastructure.RecordShareJpaRepository;
 import team.momentlog.server.document.infrastructure.ReportJpaRepository;
 import team.momentlog.server.document.infrastructure.VerifyLogJpaRepository;
@@ -50,7 +51,8 @@ public class DocumentService {
     }
 
     /**
-     * 원본 바이트로 QR 공유를 만든다. 바이트의 SHA-256이 봉인된 해시와 같아야 한다(고친 기록으로는 문서를 만들 수 없다).
+     * 원본 바이트로 QR 공유를 만든다. 바이트의 SHA-256이 봉인된 해시와 같아야 하고(고친 기록으로는 문서를 만들 수 없다),
+     * 문서를 만들 수 있게 core 원본 형식으로 읽혀야 한다.
      * 토큰 원문은 이 응답에서 한 번만 돌려주고, DB에는 해시만 남긴다.
      */
     @Transactional
@@ -59,6 +61,11 @@ public class DocumentService {
                 .orElseThrow(() -> new DocumentException.SealNotFound(recordId));
         if (!seal.matches(sha256(body))) {
             throw new DocumentException.BodyMismatch(recordId);
+        }
+        try {
+            RecordHasher.INSTANCE.parse(new String(body, StandardCharsets.UTF_8));
+        } catch (RuntimeException e) {
+            throw new DocumentException.InvalidBody(e.getMessage());
         }
         Instant now = Instant.now(clock);
         String token = newToken();

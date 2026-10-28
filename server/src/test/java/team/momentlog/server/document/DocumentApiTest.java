@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class DocumentApiTest {
 
-    private static final String BODY = "v=2\nid=d-1\ntrigger=HARD_STOP\ntriggerAt=40000\n1000|50.0|false|OFF|0.0||||\n";
+    private static final String BODY = "v=2\nid=d-1\ntrigger=HARD_STOP\ntriggerAt=40000\n1000|50.00|false|OFF|0.00|||||\n";
 
     @Autowired
     MockMvc mockMvc;
