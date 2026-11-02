@@ -34,6 +34,13 @@ public abstract class DocumentException extends RuntimeException {
         }
     }
 
+    /** 다른 기기가 봉인한 기록의 공유를 철회하려 함. */
+    public static class NotOwner extends DocumentException {
+        public NotOwner(String recordId) {
+            super("이 기기가 저장한 기록이 아닙니다: " + recordId);
+        }
+    }
+
     /** 올린 원본 바이트가 봉인 해시와 다름. */
     public static class BodyMismatch extends DocumentException {
         public BodyMismatch(String recordId) {
