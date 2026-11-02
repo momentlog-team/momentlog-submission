@@ -25,7 +25,6 @@ import team.momentlog.app.ui.models.RecordInfo
 import team.momentlog.app.ui.models.motionAt
 import team.momentlog.core.Snapshot
 import team.momentlog.core.TurnSignal
-import team.momentlog.core.Trigger
 import kotlin.math.sin
 import kotlin.math.PI
 
@@ -44,14 +43,14 @@ fun DrivingPlaybackCar(record: RecordInfo, snapshot: Snapshot?, playhead: Long, 
     val turnOn = turn == TurnSignal.LEFT || turn == TurnSignal.RIGHT
     val turnStart = if (turnOn) record.snapshots.asReversed().firstOrNull { it.atMillis <= playhead && it.turn != turn }?.atMillis ?: start else playhead
     // 깜빡임은 점등 신호를 시각화하는 효과이며, 실제 램프의 점멸 위상을 측정한 값은 아니다.
-    val end = maxOf(record.triggeredAtMillis, record.events.filter { it.trigger == Trigger.AIRBAG }.maxOfOrNull { it.atMillis } ?: record.triggeredAtMillis).coerceAtMost(record.endMillis)
+    val end = maxOf(record.triggeredAtMillis, record.events.filter { it.trigger.isCollision }.maxOfOrNull { it.atMillis } ?: record.triggeredAtMillis).coerceAtMost(record.endMillis)
     val playbackScale = 6000f / (end - start).coerceAtLeast(1)
     val blinkPhase = ((playhead - turnStart).coerceAtLeast(0) * playbackScale % 900f) / 900f
     val pulse = if (blinkPhase < 0.52f) 1f else 0f
     val blink by animateFloatAsState(if (turnOn) pulse else 0f, tween(85), label = "turnBlink")
     val lamps = CarLamps(turnRight = turn == TurnSignal.RIGHT, turnLeft = turn == TurnSignal.LEFT,
         brake = brake > 0.01f, head = snapshot?.lowBeam == true || snapshot?.highBeam == true)
-    val impactAt = record.events.firstOrNull { it.trigger == Trigger.AIRBAG }?.atMillis
+    val impactAt = record.events.firstOrNull { it.trigger.isCollision }?.atMillis
     val impactReached = impactAt != null && playhead >= impactAt
     val impact = remember(record.id) { Animatable(0f) }
     LaunchedEffect(record.id, impactReached) {
