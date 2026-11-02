@@ -11,9 +11,12 @@ public interface ReportJpaRepository extends JpaRepository<Report, String> {
 
     Optional<Report> findByDocumentNo(String documentNo);
 
-    Optional<Report> findFirstByRecordId(String recordId);
-
     List<Report> findByShareId(String shareId);
+
+    Optional<Report> findFirstByShareId(String shareId);
+
+    /** 같은 기록의 판본들, 최근 발급 순. */
+    List<Report> findByRecordIdOrderByIssuedAtDesc(String recordId);
 
     List<Report> findByIssuedAtBefore(Instant cutoff);
 

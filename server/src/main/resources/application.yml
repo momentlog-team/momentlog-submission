@@ -18,6 +18,8 @@ spring:
 momentlog:
   share:
     ttl: P30D
+    # QR 토큰을 공유 ID에서 다시 만드는 HMAC 키. 비우면 실행마다 새 키(재시작 뒤엔 같은 내용이어도 새 공유를 만든다)
+    token-secret: ${MOMENTLOG_SHARE_TOKEN_SECRET:}
   retention:
     proof-ttl: P1095D
     verify-log-ttl: P90D

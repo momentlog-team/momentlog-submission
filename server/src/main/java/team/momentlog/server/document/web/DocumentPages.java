@@ -84,7 +84,10 @@ final class DocumentPages {
                 ? "<div class=\"rec\">문서 번호 " + e(documentNo) + "<small>서버에 이 번호로 발급된 문서가 없어요</small></div>"
                 : "<div class=\"rec\">" + e(target.report().getRecordLead() == null ? "문서 번호 " + documentNo : target.report().getRecordLead())
                   + "<small>" + (target.report().getRecordAt() == null ? "" : RECORDED.format(target.report().getRecordAt().atZone(ReportFacts.ZONE)))
-                  + (target.report().getPlaceText() == null ? "" : " · " + e(target.report().getPlaceText())) + "</small></div>";
+                  + (target.report().getPlaceText() == null ? "" : " · " + e(target.report().getPlaceText())) + "</small>"
+                  + (target.newerDocumentNo() == null ? ""
+                     : "<small class=\"newer\">이 기록은 이후 진술이 수정돼 새 판본(" + e(target.newerDocumentNo()) + ")이 있어요</small>")
+                  + "</div>";
         String sealed = target == null ? "-" : SEALED.format(target.seal().getSealedAt().atZone(ReportFacts.ZONE)) + " (서버 시각)";
         String original = target == null ? "" : target.report().getPdfSha256();
         return page("원본 확인", """
@@ -262,7 +265,7 @@ final class DocumentPages {
             .btn.primary{background:var(--accent);color:#fff}.btn.icon{font-size:20px}
             .toast{position:fixed;left:20px;right:20px;bottom:100px;max-width:390px;margin:0 auto;background:var(--ink);color:#fff;border-radius:16px;padding:14px 16px;font-weight:700}
             .intro{padding:12px 24px 0}.intro h2{font-size:26px;line-height:34px;font-weight:800;letter-spacing:-.03em;margin-top:20px}.intro p{color:var(--text2);margin-top:10px}
-            .rec{font-size:15px;line-height:1.5}.rec small{display:block;font-size:13px;color:var(--text2);margin-top:2px}
+            .rec{font-size:15px;line-height:1.5}.rec small{display:block;font-size:13px;color:var(--text2);margin-top:2px}.rec small.newer{color:#C77A00;font-weight:600}
             .drop{display:block;margin:24px 20px 0;border:2px dashed var(--line);border-radius:20px;padding:28px 20px;text-align:center;cursor:pointer;background:var(--surface)}
             .drop b{display:block;font-size:16px;color:var(--accent)}.drop span{font-size:13px;color:var(--text3)}
             .privacy{display:flex;gap:8px;font-size:13px;color:var(--text2);padding:16px 24px 0}

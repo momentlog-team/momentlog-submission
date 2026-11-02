@@ -85,7 +85,7 @@ class ReportFlowTest {
         byte[] second = mockMvc.perform(get("/r/" + token + "/report.pdf")).andReturn().getResponse().getContentAsByteArray();
         assertThat(second).isEqualTo(first);
 
-        var report = reportJpaRepository.findFirstByRecordId("rep-1").orElseThrow();
+        var report = reportJpaRepository.findByDocumentNo("SG-20261103-184217").orElseThrow();
         assertThat(report.getDocumentNo()).isEqualTo("SG-20261103-184217");
         assertThat(report.getPdfSha256()).isEqualTo(sha256(first));
 

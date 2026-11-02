@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import team.momentlog.server.document.application.DocumentException;
 import team.momentlog.server.document.application.DocumentService;
@@ -28,14 +27,16 @@ public class DocumentController {
     }
 
     @Operation(summary = "QR 공유 생성",
-            description = "차량 앱이 원본(canonical 문자열)과 진술을 올린다. 원본 해시가 봉인과 다르면 409, 봉인이 없으면 404, 원본 형식이 아니면 400. 응답의 token으로 QR 주소(/r/{token})를 만든다.")
+            description = "차량 앱이 원본(canonical 문자열)과 진술을 올린다. 원본 해시가 봉인과 다르면 409, 봉인이 없으면 404, 원본 형식이 아니면 400. "
+                    + "같은 기록에 진술·장소가 같은 유효한 공유가 있으면 그 공유를 200으로 돌려주고, 없으면 새로 만들어 201. "
+                    + "응답의 token으로 QR 주소(/r/{token})를 만든다.")
     @PostMapping("/api/v1/records/{recordId}/documents")
-    @ResponseStatus(HttpStatus.CREATED)
-    public DocumentResponse.ShareDetail createShare(@PathVariable String recordId,
-                                                    @Valid @RequestBody DocumentRequest.CreateShare request) {
+    public ResponseEntity<DocumentResponse.ShareDetail> createShare(@PathVariable String recordId,
+                                                                    @Valid @RequestBody DocumentRequest.CreateShare request) {
         DocumentService.CreatedShare created = documentService.createShare(
                 recordId, request.body().getBytes(StandardCharsets.UTF_8), request.statementJson(), request.placeText());
-        return DocumentResponse.ShareDetail.from(created);
+        return ResponseEntity.status(created.created() ? HttpStatus.CREATED : HttpStatus.OK)
+                .body(DocumentResponse.ShareDetail.from(created));
     }
 
     @Operation(summary = "발급 문서 대조",

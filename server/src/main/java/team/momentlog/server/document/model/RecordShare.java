@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
+import java.util.Objects;
 
 /**
  * QR로 여는 문서 공유. 차량 앱이 원본 바이트를 올리면 봉인된 해시와 같은지 확인한 뒤에만 만든다.
@@ -83,6 +84,15 @@ public class RecordShare {
         statementJson = null;
         placeText = null;
         purgedAt = now;
+    }
+
+    /** 진술·장소까지 같은 공유인지. 같으면 새로 만들지 않고 재사용한다. */
+    public boolean hasSameContent(String statementJson, String placeText) {
+        return Objects.equals(this.statementJson, statementJson) && Objects.equals(this.placeText, placeText);
+    }
+
+    public boolean matchesToken(String candidateSha256) {
+        return tokenSha256.equalsIgnoreCase(candidateSha256);
     }
 
     public void open(Instant now) {
