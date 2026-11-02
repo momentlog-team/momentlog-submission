@@ -24,6 +24,13 @@ import java.io.File
 class RecordStore(context: Context) {
     private val dir = File(context.filesDir, "records").apply { mkdirs() }
 
+    init {
+        // 이전 Debug 버전이 자동 삽입한 예시 파일만 정리한다. 실제 기록은 UUID를 쓴다.
+        synchronized(lock) {
+            recordFiles().filter { it.name.startsWith("mock-") }.forEach { AtomicFile(it).delete() }
+        }
+    }
+
     fun save(record: IncidentRecord, sha256: String, savedWhileParked: Boolean = false) = synchronized(lock) {
         val json = JSONObject()
             .put("id", record.id)

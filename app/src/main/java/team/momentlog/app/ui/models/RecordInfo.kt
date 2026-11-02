@@ -65,7 +65,6 @@ data class RecordInfo(
     /** 앞서 저장된 기록을 합쳤는지. */
     val merged: Boolean,
 ) {
-    val isMock: Boolean get() = id.startsWith("mock-")
     val triggerLabel: String get() = trigger.label
     val facts: RecordFacts by lazy { RecordFacts.of(snapshots, triggeredAtMillis) }
 

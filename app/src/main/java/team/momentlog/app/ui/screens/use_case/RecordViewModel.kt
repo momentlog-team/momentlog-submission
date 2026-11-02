@@ -8,7 +8,6 @@ import kotlinx.coroutines.launch
 import team.momentlog.app.core.data.repository.RecordRepository
 import team.momentlog.app.ui.models.RecordInfo
 import team.momentlog.core.IncidentNarrator
-import team.momentlog.app.BuildConfig
 
 /** 기록 목록과 결과 화면. 새 기록이 저장되면 목록을 다시 읽는다. */
 class RecordViewModel(application: Application) : BaseViewModel(application) {
@@ -52,7 +51,6 @@ class RecordViewModel(application: Application) : BaseViewModel(application) {
     fun loadRecords() {
         viewModelScope.launch {
             _records.value = withLoading {
-                if (BuildConfig.DEBUG) recordRepository.ensureMockRecords()
                 recordRepository.getRecords().map { RecordInfo.from(it, narrator) }
             }
         }

@@ -31,9 +31,9 @@ class SealRetryQueue(context: Context, private val scope: CoroutineScope) {
                 var retry = false
                 try {
                     if (connectivity.activeNetwork != null) {
-                        // 기존 보관 정책을 그대로 적용하고, 시연용 mock 파일은 서버에 보내지 않는다.
+                        // 기존 보관 정책을 그대로 적용한다.
                         store.purgeExpired(System.currentTimeMillis())
-                        for (saved in store.list().filter { !it.sealed && !it.sealRejected && !it.record.id.startsWith("mock-") }) {
+                        for (saved in store.list().filter { !it.sealed && !it.sealRejected }) {
                             when (client.seal(saved.record.id, saved.sha256, saved.record.triggerAtMillis)) {
                                 SealClient.Result.SEALED -> store.markSealed(saved.record.id)
                                 SealClient.Result.REJECTED -> {
