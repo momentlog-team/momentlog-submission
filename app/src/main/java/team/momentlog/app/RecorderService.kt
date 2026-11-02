@@ -54,7 +54,7 @@ class RecorderService : Service() {
             val snapshot = state.snapshot(System.currentTimeMillis())
             val wasCapturing = recorder.isCapturing
             val completed = recorder.onSnapshot(snapshot)
-            if (!wasCapturing && recorder.isCapturing) onCaptureStarted(Trigger.HARD_STOP, snapshot)
+            if (!wasCapturing && recorder.isCapturing) onCaptureStarted(recorder.pendingTrigger ?: Trigger.HARD_STOP, snapshot)
             if (recorder.isCapturing) _capture.value?.let { c -> if (c.events != recorder.pendingEvents) _capture.value = c.copy(events = recorder.pendingEvents) }
             completed?.let(::onRecordCompleted)
             _live.value = snapshot

@@ -15,11 +15,19 @@ data class CaptureWindow(val preMillis: Long, val postMillis: Long, val afterSto
     }
 }
 
-/** 기록이 저장된 이유. */
-enum class Trigger(val label: String, val window: CaptureWindow) {
-    HARD_STOP("급정지", CaptureWindow(30_000, 10_000, afterStop = true)),
-    VOICE("기록 요청", CaptureWindow(180_000, 30_000, afterStop = false)),
-    AIRBAG("에어백 전개", CaptureWindow(30_000, 10_000, afterStop = true)),
+/**
+ * 기록이 저장된 이유. [label]은 마커·목록에 쓰는 이름, [anchor]는 경위 문장의 기준 표현("충돌 4.1초 전").
+ * "충돌"은 충격·에어백이 감지된 기록에만 쓴다. 급정지만으로는 부딪혔다고 단정하지 않는다.
+ */
+enum class Trigger(val label: String, val anchor: String, val window: CaptureWindow) {
+    HARD_STOP("급정지", "급정지", CaptureWindow(30_000, 10_000, afterStop = true)),
+    /** 가속도 센서의 수평 충격, 또는 브레이크를 밟은 채 속도가 갑자기 오름(뒤에서 밀림). 정차 중·저속 추돌용. */
+    IMPACT("충격 감지", "충돌", CaptureWindow(30_000, 10_000, afterStop = true)),
+    VOICE("기록 요청", "기록 요청", CaptureWindow(180_000, 30_000, afterStop = false)),
+    AIRBAG("에어백 전개", "충돌", CaptureWindow(30_000, 10_000, afterStop = true));
+
+    /** 부딪힌 것이 확인된 계기. 자동 보관, "충돌 N초 전" 표현, 충격 마커에 쓴다. */
+    val isCollision: Boolean get() = this == IMPACT || this == AIRBAG
 }
 
 /** 기록 안의 감지 시점 하나. 첫 감지(기준 시점)와 이어 붙은 감지, 합친 앞선 기록의 감지가 모두 들어간다. */
@@ -39,7 +47,7 @@ data class IncidentRecord(
 )
 
 /**
- * 스냅샷을 계속 받으면서 급정지·음성 요청·에어백 신호가 오면 기록을 만든다.
+ * 스냅샷을 계속 받으면서 급정지·충격·음성 요청·에어백 신호가 오면 기록을 만든다.
  * 기준 시점 뒤 저장 구간이 끝나면 [onSnapshot]이 완성된 기록을 돌려준다.
  *
  * - 버퍼는 가장 긴 저장 구간(3분)만큼 들고 있고, 기록을 만든 뒤에도 비우지 않는다(이어지는 "기록해"가 앞 구간을 쓸 수 있게).
@@ -48,6 +56,7 @@ data class IncidentRecord(
  */
 class IncidentRecorder(
     private val detector: HardStopDetector = HardStopDetector(),
+    private val impactDetector: ImpactDetector = ImpactDetector(),
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) {
     /** 직전 구간 + 직후 구간을 다 담을 수 있어야 기록이 완성될 때 앞부분이 밀려나지 않는다. */
@@ -67,6 +76,9 @@ class IncidentRecorder(
     }
 
     val isCapturing: Boolean get() = pending != null
+
+    /** 저장 중인 기록의 계기(0초). 저장 중이 아니면 null. */
+    val pendingTrigger: Trigger? get() = pending?.trigger
 
     /** 저장 중인 기록의 감지 시점들(시각 순서). 저장 중이 아니면 빈 목록. */
     val pendingEvents: List<IncidentEvent> get() = pending?.events?.toList().orEmpty()
@@ -94,15 +106,23 @@ class IncidentRecorder(
     fun onSnapshot(snapshot: Snapshot): IncidentRecord? {
         buffer.add(snapshot)
         val hardStop = detector.feed(snapshot)
+        val impact = impactDetector.feed(snapshot)
         forgetOld(snapshot.atMillis)
 
-        val capturing = pending
-        if (capturing == null) {
-            if (hardStop) trigger(Trigger.HARD_STOP, snapshot.atMillis)
-            return completeIfDue(snapshot.atMillis)
+        // 같은 순간에 둘 다 잡히면 부딪힌 쪽(충격)으로 남긴다.
+        when {
+            impact -> trigger(Trigger.IMPACT, snapshot.atMillis)
+            hardStop -> trigger(Trigger.HARD_STOP, snapshot.atMillis)
         }
-        if (hardStop) append(capturing, Trigger.HARD_STOP, snapshot.atMillis, Trigger.HARD_STOP.window.postMillis)
         return completeIfDue(snapshot.atMillis)
+    }
+
+    /**
+     * 헤드유닛 가속도 센서 값을 넣는다. 중력을 뺀 선가속도의 차량 수평 성분(m/s²)을 넘긴다.
+     * 수평 충격이면 충격 기록을 시작하거나 저장 중인 기록에 이어 붙인다. 기록 완성은 다음 [onSnapshot]에서 한다.
+     */
+    fun onAcceleration(atMillis: Long, xMps2: Float, yMps2: Float) {
+        if (impactDetector.feedAcceleration(atMillis, xMps2, yMps2)) trigger(Trigger.IMPACT, atMillis)
     }
 
     private fun append(capturing: Pending, trigger: Trigger, atMillis: Long, postMillis: Long) {

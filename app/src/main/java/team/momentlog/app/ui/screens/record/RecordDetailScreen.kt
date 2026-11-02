@@ -67,7 +67,6 @@ import team.momentlog.app.ui.screens.widget.record.TimelineGraph
 import team.momentlog.app.ui.screens.widget.record.TimelineStep
 import team.momentlog.core.TurnSignal
 import team.momentlog.core.Snapshot
-import team.momentlog.core.Trigger
 import team.momentlog.app.ui.models.snapshotAt
 import team.momentlog.app.ui.models.relativeText
 import team.momentlog.app.ui.screens.widget.car.DrivingPlaybackCar
@@ -104,7 +103,7 @@ fun RecordDetailScreen(
         var playing by remember(current.id) { mutableStateOf(true) }
         val progress = remember(current.id, replayKey) { Animatable(0f) }
         val start = maxOf(current.startMillis, current.triggeredAtMillis - 10_000)
-        val end = maxOf(current.triggeredAtMillis, current.events.filter { it.trigger == Trigger.AIRBAG }.maxOfOrNull { it.atMillis } ?: current.triggeredAtMillis).coerceAtMost(current.endMillis)
+        val end = maxOf(current.triggeredAtMillis, current.events.filter { it.trigger.isCollision }.maxOfOrNull { it.atMillis } ?: current.triggeredAtMillis).coerceAtMost(current.endMillis)
         LaunchedEffect(current.id, replayKey, playing) {
             if (playing) progress.animateTo(1f, tween((6000 * (1 - progress.value)).toInt().coerceAtLeast(1), if (progress.value == 0f) 450 else 0, LinearEasing))
         }
@@ -325,5 +324,5 @@ private fun steps(record: RecordInfo, colors: MomentlogColors): List<TimelineSte
 private fun markers(record: RecordInfo, colors: MomentlogColors): List<GraphMarker> =
     record.events.map { e ->
         val kind = if (e.atMillis == record.triggeredAtMillis && e.trigger == record.trigger) record.kind else RecordKind.of(e)
-        GraphMarker((e.atMillis - record.triggeredAtMillis) / 1000f, if (e.trigger == Trigger.AIRBAG) "충격 감지" else null, kind.tone(colors))
+        GraphMarker((e.atMillis - record.triggeredAtMillis) / 1000f, if (e.trigger.isCollision) "충격 감지" else null, kind.tone(colors))
     }

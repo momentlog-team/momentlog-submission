@@ -16,7 +16,8 @@ class IncidentNarrator(
     private val straightThresholdDeg: Float = 5f,
 ) {
     fun narrate(record: IncidentRecord): List<String> {
-        val label = record.trigger.label
+        // "충돌 4.1초 전", "급정지 4.1초 전", "기록 요청 4.1초 전". 충돌은 충격·에어백이 0초일 때만.
+        val label = record.trigger.anchor
         val before = record.snapshots.filter { it.atMillis <= record.triggerAtMillis }
         val at = before.lastOrNull() ?: return listOf("$label 시점의 기록이 없습니다.")
 
@@ -38,6 +39,7 @@ class IncidentNarrator(
         val span = if (afterMillis < 1_000) "직전 ${before}의" else "직전 ${withAnd(before)} 직후 ${duration(afterMillis)}의"
         return when (record.trigger) {
             Trigger.HARD_STOP -> "급정지가 감지되어 $span 차량 기록을 저장했습니다."
+            Trigger.IMPACT -> "충격이 감지되어 $span 차량 기록을 저장했습니다."
             Trigger.VOICE -> "운전자 요청으로 $span 차량 기록을 저장했습니다."
             Trigger.AIRBAG -> "에어백 전개 신호가 들어와 $span 차량 기록을 저장했습니다."
         }

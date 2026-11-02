@@ -17,7 +17,7 @@ import java.io.File
 /**
  * 기록을 차 안(앱 내부 저장소)에 JSON으로 둔다. 위치·조작 내역은 서버로 보내지 않는다.
  *
- * 에어백(충격)이 감지됐거나 진술을 남긴 기록, 사용자가 보관을 고른 기록은 남긴다.
+ * 충격·에어백이 감지됐거나 진술을 남긴 기록, 사용자가 보관을 고른 기록은 남긴다.
  * 나머지는 저장 후 [Constant.RETENTION_DAYS]일 뒤 [purgeExpired]가 지운다.
  * 진술은 센서 기록(snapshots)과 다른 필드에 두어, 해시(원본 지문) 대상에 섞이지 않게 한다.
  */
@@ -93,7 +93,7 @@ class RecordStore(context: Context) {
     ) {
         /** 자동 보관 또는 사용자가 보관한 기록. */
         val isKept: Boolean
-            get() = retained || record.trigger == Trigger.AIRBAG || statementState == StatementState.DONE
+            get() = retained || record.events.any { it.trigger.isCollision } || statementState == StatementState.DONE
 
         val deleteAtMillis: Long get() = record.triggerAtMillis + Constant.RETENTION_DAYS * 24 * 60 * 60 * 1000L
     }

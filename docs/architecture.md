@@ -53,6 +53,10 @@ Light·Wiper·Airbag ────────┼─▶ SignalSource ─▶ Signa
 | 재감지 대기 | 10초 | `HardStopDetector` |
 | 스냅샷 주기 | 100ms | `RecorderService` |
 | 핸들 정면 판정 | ±5° | `IncidentNarrator` |
+| 충격: 뒤에서 밀림 | 브레이크를 밟은 채 0.5초 안 2km/h 이상 상승 | `ImpactDetector.feed` |
+| 충격: 수평 가속도 | 중력 뺀 수평 성분 14.7m/s²(약 1.5g) 이상. 앱 연결 필요 | `ImpactDetector.feedAcceleration` |
+| 충격 재감지 대기 | 10초 | `ImpactDetector` |
+| 경위 문장 기준 표현 | 충격·에어백 "충돌", 급정지 "급정지", 기록해 "기록 요청" | `Trigger.anchor` |
 
 ## 역할 분담 (앱 1, 백엔드 2)
 

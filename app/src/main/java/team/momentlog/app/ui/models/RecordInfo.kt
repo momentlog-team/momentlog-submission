@@ -38,7 +38,7 @@ enum class RecordKind(
         fun of(event: IncidentEvent) = of(event.trigger, savedWhileParked = false)
 
         fun of(trigger: Trigger, savedWhileParked: Boolean) = when (trigger) {
-            Trigger.AIRBAG -> IMPACT
+            Trigger.AIRBAG, Trigger.IMPACT -> IMPACT
             Trigger.HARD_STOP -> HARD_STOP
             Trigger.VOICE -> if (savedWhileParked) AFTER_STOP else VOICE
         }

@@ -68,7 +68,7 @@ public record ReportFacts(
         if (brakeStart != null) {
             steps.add(new Step(rel(brakeStart, t0), "브레이크 시작", kph(brakeStart.getSpeedKph()), "brake"));
         }
-        steps.add(new Step(0, label + " 감지", at == null ? null : kph(at.getSpeedKph()), "impact"));
+        steps.add(new Step(0, label.endsWith("감지") ? label : label + " 감지", at == null ? null : kph(at.getSpeedKph()), "impact"));
         steps.sort((a, b) -> Double.compare(a.atSec(), b.atSec()));
 
         Float maxBefore = before.stream().map(Snapshot::getSpeedKph).filter(v -> v != null).max(Float::compare).orElse(null);
@@ -142,6 +142,7 @@ public record ReportFacts(
     private static String pill(Trigger trigger) {
         return switch (trigger) {
             case HARD_STOP -> "급정지 감지 · 자동 저장";
+            case IMPACT -> "충격 감지 · 자동 저장";
             case VOICE -> "운전자 요청 · 음성 저장";
             case AIRBAG -> "에어백 전개 · 자동 저장";
         };
