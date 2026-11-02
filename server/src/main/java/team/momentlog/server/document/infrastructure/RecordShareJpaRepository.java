@@ -13,6 +13,8 @@ public interface RecordShareJpaRepository extends JpaRepository<RecordShare, Str
 
     List<RecordShare> findByExpiresAtLessThanEqualAndPurgedAtIsNull(Instant now);
 
+    List<RecordShare> findByRecordIdAndExpiresAtAfterAndPurgedAtIsNull(String recordId, Instant now);
+
     List<RecordShare> findByCreatedAtBefore(Instant cutoff);
 
     boolean existsByRecordId(String recordId);
