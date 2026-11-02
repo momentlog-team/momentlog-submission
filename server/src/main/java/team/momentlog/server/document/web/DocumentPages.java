@@ -19,6 +19,7 @@ import static org.springframework.web.util.HtmlUtils.htmlEscape;
 final class DocumentPages {
 
     private static final DateTimeFormatter SEALED = DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm:ss");
+    private static final DateTimeFormatter RECORDED = DateTimeFormatter.ofPattern("yyyy.MM.dd (E) HH:mm:ss", Locale.KOREAN);
 
     private DocumentPages() {
     }
@@ -81,8 +82,9 @@ final class DocumentPages {
     static String verify(String documentNo, ReportService.VerifyTarget target) {
         String rec = target == null
                 ? "<div class=\"rec\">문서 번호 " + e(documentNo) + "<small>서버에 이 번호로 발급된 문서가 없어요</small></div>"
-                : "<div class=\"rec\">" + e(target.facts().lead()) + "<small>" + target.facts().date() + " " + target.facts().time()
-                  + (target.placeText() == null ? "" : " · " + e(target.placeText())) + "</small></div>";
+                : "<div class=\"rec\">" + e(target.report().getRecordLead() == null ? "문서 번호 " + documentNo : target.report().getRecordLead())
+                  + "<small>" + (target.report().getRecordAt() == null ? "" : RECORDED.format(target.report().getRecordAt().atZone(ReportFacts.ZONE)))
+                  + (target.report().getPlaceText() == null ? "" : " · " + e(target.report().getPlaceText())) + "</small></div>";
         String sealed = target == null ? "-" : SEALED.format(target.seal().getSealedAt().atZone(ReportFacts.ZONE)) + " (서버 시각)";
         String original = target == null ? "" : target.report().getPdfSha256();
         return page("원본 확인", """
