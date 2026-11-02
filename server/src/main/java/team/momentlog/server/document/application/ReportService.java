@@ -60,15 +60,18 @@ public class ReportService {
         RecordShare share = findShare(token);
         share.open(Instant.now(clock));
         RecordSeal seal = recordSealJpaRepository.findById(share.getRecordId()).orElseThrow();
-        Report report = reportJpaRepository.findFirstByRecordId(share.getRecordId()).orElse(null);
+        Report report = reportJpaRepository.findFirstByShareId(share.getShareId()).orElse(null);
         return new SharedDocument(share, seal, facts(share), Statement.parse(share.getStatementJson()), report);
     }
 
-    /** PDF를 돌려준다. 이 기록의 PDF가 없으면 만들어 저장하고 t_report에 남긴다. */
+    /**
+     * PDF를 돌려준다. 이 공유(진술 판본)의 PDF가 없으면 만들어 저장하고 t_report에 남긴다.
+     * 같은 공유면 같은 파일을 다시 준다(해시 고정). 진술이 바뀐 새 공유는 새 문서 번호로 따로 발급한다.
+     */
     @Transactional
     public IssuedPdf issue(String token) {
         RecordShare share = findShare(token);
-        Report existing = reportJpaRepository.findFirstByRecordId(share.getRecordId()).orElse(null);
+        Report existing = reportJpaRepository.findFirstByShareId(share.getShareId()).orElse(null);
         if (existing != null) {
             return new IssuedPdf(existing, read(existing.getStorageKey()));
         }
@@ -93,11 +96,18 @@ public class ReportService {
     /**
      * 09 원본 대조 페이지가 보여 줄 문서. 없으면 null.
      * 공유 본문은 30일 뒤 지워지므로 t_report에 복사해 둔 값과 봉인만 쓴다.
+     * 같은 기록에 더 나중에 발급한 판본(진술 수정)이 있으면 그 문서 번호를 함께 준다.
      */
     @Transactional(readOnly = true)
     public VerifyTarget verifyTarget(String documentNo) {
         return reportJpaRepository.findByDocumentNo(documentNo)
-                .map(report -> new VerifyTarget(report, recordSealJpaRepository.findById(report.getRecordId()).orElseThrow()))
+                .map(report -> {
+                    String newer = reportJpaRepository.findByRecordIdOrderByIssuedAtDesc(report.getRecordId()).stream()
+                            .filter(other -> other.getIssuedAt().isAfter(report.getIssuedAt()))
+                            .map(Report::getDocumentNo)
+                            .findFirst().orElse(null);
+                    return new VerifyTarget(report, recordSealJpaRepository.findById(report.getRecordId()).orElseThrow(), newer);
+                })
                 .orElse(null);
     }
 
@@ -107,7 +117,8 @@ public class ReportService {
     public record IssuedPdf(Report report, byte[] bytes) {
     }
 
-    public record VerifyTarget(Report report, RecordSeal seal) {
+    /** [newerDocumentNo]: 같은 기록의 가장 최근 판본 문서 번호. 이 문서가 최신이면 null. */
+    public record VerifyTarget(Report report, RecordSeal seal, String newerDocumentNo) {
     }
 
     private RecordShare findShare(String token) {
