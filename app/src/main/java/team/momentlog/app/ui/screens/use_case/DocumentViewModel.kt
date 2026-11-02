@@ -1,5 +1,8 @@
 package team.momentlog.app.ui.screens.use_case
 
+import kotlinx.coroutines.Job
+import java.net.URI
+import team.momentlog.app.core.data.model.record.DocumentResponse
 import android.app.Application
 import android.net.ConnectivityManager
 import android.net.Network
@@ -12,13 +15,7 @@ import team.momentlog.app.core.data.model.record.VerifyResponse
 import team.momentlog.app.core.data.repository.RecordRepository
 import team.momentlog.app.ui.models.RecordInfo
 
-/**
- * 휴대폰으로 문서 받기. 원본 봉인 상태를 확인하고 문서 주소를 QR로 넘긴다.
- *
- * TODO(앱): QR 내용을 "기록 ID + 서명" 짧은 URL로 바꾸기(형식은 백엔드 A·B와 맞춤).
- *  휴대폰에서 링크를 열면 서버 알림 또는 주기 확인으로 [markOpened]를 부르기.
- *  통신이 없을 때 원본 지문을 들고 있다가 연결되면 봉인 재전송하기.
- */
+/** 공유 생성 결과가 도착한 뒤에만 토큰 주소를 QR로 표시한다. */
 class DocumentViewModel(application: Application) : BaseViewModel(application) {
 
     private val recordRepository = RecordRepository(application)
@@ -47,15 +44,24 @@ class DocumentViewModel(application: Application) : BaseViewModel(application) {
         connectivity?.registerDefaultNetworkCallback(networkCallback)
     }
 
-    fun documentUrl(record: RecordInfo): String = BuildConfig.DOCUMENT_BASE_URL + record.id
+    private val _share = MutableStateFlow<DocumentResponse?>(null)
+    val share: StateFlow<DocumentResponse?> = _share
+    private var shareJob: Job? = null
 
-    fun checkSeal(record: RecordInfo) {
-        if (record.isMock) return
+    fun documentUrl(recordId: String): String? = _share.value
+        ?.takeIf { it.recordId == recordId }
+        ?.let { URI(BuildConfig.DOCUMENT_BASE_URL).resolve(it.path).toString() }
+
+    fun createDocument(record: RecordInfo) {
+        shareJob?.cancel()
         _openedAtMillis.value = null
-        viewModelScope.launch {
-            withLoading { recordRepository.verify(record.id, record.sha256) }.fold(
+        _failure.value = null
+        _verify.value = null
+        _share.value = null
+        shareJob = viewModelScope.launch {
+            withLoading { recordRepository.createDocument(record.id) }.fold(
                 left = { _failure.value = it },
-                right = { _verify.value = it },
+                right = { _share.value = it },
             )
         }
     }

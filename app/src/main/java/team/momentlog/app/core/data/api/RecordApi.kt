@@ -1,5 +1,7 @@
 package team.momentlog.app.core.data.api
 
+import team.momentlog.app.core.data.model.record.DocumentRequest
+import team.momentlog.app.core.data.model.record.DocumentResponse
 import retrofit2.http.Body
 import retrofit2.http.POST
 import retrofit2.http.Path
@@ -17,6 +19,6 @@ interface RecordApi {
     @POST("api/v1/records/{recordId}/verify")
     suspend fun verify(@Path("recordId") recordId: String, @Body request: VerifyRequest): VerifyResponse
 
-    // TODO(백엔드B): 사고 정리 문서 API가 나오면 추가
-    // @POST("api/v1/records/{recordId}/documents")
+    @POST("api/v1/records/{recordId}/documents")
+    suspend fun createDocument(@Path("recordId") recordId: String, @Body request: DocumentRequest): DocumentResponse
 }

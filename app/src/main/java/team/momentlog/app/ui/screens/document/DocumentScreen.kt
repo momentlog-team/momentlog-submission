@@ -54,10 +54,12 @@ fun DocumentScreen(recordId: String, recordViewModel: RecordViewModel, documentV
     val record by recordViewModel.selected.collectAsState()
     val online by documentViewModel.online.collectAsState()
     val openedAt by documentViewModel.openedAtMillis.collectAsState()
+    val share by documentViewModel.share.collectAsState()
+    val failure by documentViewModel.failure.collectAsState()
     val current = record?.takeIf { it.id == recordId }
 
-    LaunchedEffect(current?.id, online) {
-        if (online) current?.let(documentViewModel::checkSeal)
+    LaunchedEffect(current, online) {
+        if (online) current?.let(documentViewModel::createDocument)
     }
 
     val colors = LocalAppColors.current
@@ -66,6 +68,8 @@ fun DocumentScreen(recordId: String, recordViewModel: RecordViewModel, documentV
         val panelHeight = if (split) 560.q else null
         val qrState = when {
             !online -> QrState.OFFLINE
+            failure != null -> QrState.ERROR
+            share?.recordId != recordId -> QrState.LOADING
             openedAt != null -> QrState.OPENED
             else -> QrState.READY
         }
@@ -75,7 +79,7 @@ fun DocumentScreen(recordId: String, recordViewModel: RecordViewModel, documentV
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                QrCard(qrState, current?.let(documentViewModel::documentUrl), if (split) 420 else 560, if (split) 360 else 480)
+                QrCard(qrState, documentViewModel.documentUrl(recordId), if (split) 420 else 560, if (split) 360 else 480)
                 Spacer(Modifier.height(24.q))
                 Text("문서에는 경위 문장과 그래프, 원본 대조 QR이 들어가요", style = textStyle(24, 32, color = colors.textSecondary), textAlign = TextAlign.Center)
             }
@@ -92,6 +96,8 @@ fun DocumentScreen(recordId: String, recordViewModel: RecordViewModel, documentV
                 .enterFromBelow(16.q, key = qrState),
         ) {
             when (qrState) {
+                QrState.LOADING -> StatusChip("문서 준비 중", colors.accent, icon = AppIcon.QR)
+                QrState.ERROR -> StatusChip("문서 생성 실패", colors.warning, icon = AppIcon.OFFLINE)
                 QrState.READY -> StatusChip("휴대폰으로 받기", colors.accent, icon = AppIcon.QR)
                 QrState.OPENED -> StatusChip("휴대폰에서 열었어요 · ${Formats.clock(openedAt!!)}", colors.recording, icon = AppIcon.CHECK)
                 QrState.OFFLINE -> StatusChip("통신 연결 안 됨", colors.warning, icon = AppIcon.OFFLINE)
@@ -99,6 +105,8 @@ fun DocumentScreen(recordId: String, recordViewModel: RecordViewModel, documentV
             Spacer(Modifier.height(if (split) 24.q else 54.q))
             Text(
                 when (qrState) {
+                    QrState.LOADING -> "공유 링크를 만들고 있어요"
+                    QrState.ERROR -> "문서를 만들지 못했어요"
                     QrState.READY -> "휴대폰 카메라로 찍으세요"
                     QrState.OPENED -> "휴대폰에서 문서를 받으세요"
                     QrState.OFFLINE -> "연결되면 바로 QR을 만들게요"
@@ -114,6 +122,12 @@ fun DocumentScreen(recordId: String, recordViewModel: RecordViewModel, documentV
                 },
                 style = textStyle(30, 42, color = colors.textSecondary),
             )
+            if (qrState == QrState.ERROR) {
+                Spacer(Modifier.height(16.q))
+                Text(failure?.message ?: "다시 시도해 주세요.", style = textStyle(24, 32, color = colors.textSecondary))
+                Spacer(Modifier.height(16.q))
+                CustomButton("다시 시도", { current?.let(documentViewModel::createDocument) })
+            }
             if (!split) {
                 Spacer(Modifier.height(80.q))
                 Steps()
@@ -145,7 +159,7 @@ fun DocumentScreen(recordId: String, recordViewModel: RecordViewModel, documentV
     }
 }
 
-private enum class QrState { READY, OPENED, OFFLINE }
+private enum class QrState { READY, OPENED, OFFLINE, LOADING, ERROR }
 
 @Composable
 private fun QrCard(state: QrState, url: String?, cardSize: Int, qrSize: Int) {
@@ -171,6 +185,9 @@ private fun QrCard(state: QrState, url: String?, cardSize: Int, qrSize: Int) {
                     "통신이 연결되면\n여기에 QR이 나타나요",
                     style = textStyle(28, 40, color = colors.textSecondary), textAlign = TextAlign.Center,
                 )
+            }
+            state == QrState.LOADING || state == QrState.ERROR -> {
+                Text(if (state == QrState.LOADING) "공유 링크 준비 중…" else "다시 시도해 주세요", style = textStyle(28, 40, color = colors.textSecondary))
             }
             url != null -> {
                 QrCode(url, Modifier.size(qrSize.q))

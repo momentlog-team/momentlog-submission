@@ -1,5 +1,9 @@
 package team.momentlog.app.core.data.repository
 
+import kotlinx.coroutines.CancellationException
+import org.json.JSONObject
+import team.momentlog.app.core.data.model.record.DocumentRequest
+import team.momentlog.app.core.data.model.record.DocumentResponse
 import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
@@ -66,5 +70,24 @@ class RecordRepository(context: Context) {
     /** 7일 자동 삭제에서 뺀다. */
     suspend fun retain(recordId: String) = withContext(Dispatchers.IO) { store.retain(recordId) }
 
-    // TODO(앱): 삭제, 사고 정리 문서 요청(백엔드B 문서 API)
+    /** QR 화면을 열었을 때만 저장된 원본과 진술을 서버에 공유한다. */
+    suspend fun createDocument(recordId: String): Either<Failure, DocumentResponse> = withContext(Dispatchers.IO) {
+        try {
+            val saved = getRecord(recordId)
+                ?: return@withContext Either.Left(Failure(message = "기록을 찾을 수 없어요."))
+            val statement = if (saved.statement.isNullOrBlank() && saved.plate.isNullOrBlank()) null else
+                JSONObject().put("text", saved.statement ?: "")
+                    .put("plate", saved.plate ?: JSONObject.NULL).toString()
+            Either.Right(api.createDocument(recordId, DocumentRequest(
+                body = RecordHasher.canonical(saved.record),
+                statementJson = statement,
+            )))
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            Either.Left(ErrorUtil.errorConvert(error))
+        }
+    }
+
+    // TODO(앱): 삭제
 }
