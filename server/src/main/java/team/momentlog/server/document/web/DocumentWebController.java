@@ -62,6 +62,6 @@ public class DocumentWebController {
     @ResponseBody
     public ResponseEntity<String> expired(DocumentException e) {
         return ResponseEntity.status(HttpStatus.GONE).contentType(HTML)
-                .body(DocumentPages.error("공유 기간이 지났어요", "차량에서 문서를 다시 보내 주세요."));
+                .body(DocumentPages.error("공유 기간이 지났거나 취소됐어요", "필요하면 차량에서 문서를 다시 보내 주세요."));
     }
 }

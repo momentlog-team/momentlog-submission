@@ -26,11 +26,16 @@ public class RecordSealService {
     /**
      * 해시를 봉인한다. 통신이 끊겼다가 다시 보내는 경우가 있으므로 같은 기록·같은 해시는 처음 봉인을 그대로 돌려준다.
      * 같은 기록 ID로 다른 해시가 오면 원본을 덮어쓰지 않고 거부한다.
+     * 기기 토큰이 오면 기기를 확인하고(처음이면 등록), 없으면 예전 앱 버전처럼 기기 ID만 기록한다.
      */
     @Transactional
-    public RecordSeal seal(String recordId, String deviceId, String sha256, int formatVersion, Instant deviceCreatedAt) {
+    public RecordSeal seal(String recordId, String deviceId, String deviceToken, String sha256, int formatVersion, Instant deviceCreatedAt) {
         if (deviceId != null && !deviceId.isBlank()) {
-            deviceService.touch(deviceId);
+            if (deviceToken != null && !deviceToken.isBlank()) {
+                deviceService.authenticate(deviceId, deviceToken);
+            } else {
+                deviceService.touch(deviceId);
+            }
         }
         Optional<RecordSeal> existing = recordSealJpaRepository.findById(recordId);
         if (existing.isPresent()) {

@@ -5,11 +5,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
+import team.momentlog.server.device.api.DeviceHeaders;
 import team.momentlog.server.document.application.DocumentException;
 import team.momentlog.server.document.application.DocumentService;
 
@@ -39,6 +42,18 @@ public class DocumentController {
                 .body(DocumentResponse.ShareDetail.from(created));
     }
 
+    @Operation(summary = "QR 공유 철회",
+            description = "차에서 기록을 지웠을 때 차량 앱이 호출. 그 기록의 공유 링크를 모두 닫고(410) 원본·진술·PDF 파일을 지운다. "
+                    + "X-Device-Id·X-Device-Token 헤더가 필요하고, 기록을 봉인한 기기만 할 수 있다(토큰 없음·다름 401, 다른 기기 403, 봉인 없음 404). "
+                    + "이미 건넨 PDF의 원본 확인은 계속 된다. 여러 번 불러도 같은 결과(204).")
+    @DeleteMapping("/api/v1/records/{recordId}/documents")
+    public ResponseEntity<Void> revokeShares(@PathVariable String recordId,
+                                             @RequestHeader(name = DeviceHeaders.DEVICE_ID, required = false) String deviceId,
+                                             @RequestHeader(name = DeviceHeaders.DEVICE_TOKEN, required = false) String deviceToken) {
+        documentService.revokeShares(recordId, deviceId, deviceToken);
+        return ResponseEntity.noContent().build();
+    }
+
     @Operation(summary = "발급 문서 대조",
             description = "문서 번호(SG-YYYYMMDD-HHMMSS)와 제출된 PDF의 SHA-256으로 대조. MATCH / MISMATCH / NOT_FOUND. 확인할 때마다 이력을 남긴다.")
     @PostMapping("/api/v1/documents/{documentNo}/verify")
@@ -55,6 +70,11 @@ public class DocumentController {
     @ExceptionHandler(DocumentException.InvalidBody.class)
     public ResponseEntity<Map<String, String>> invalidBody(DocumentException e) {
         return ResponseEntity.badRequest().body(Map.of("errorCode", "INVALID_BODY", "message", e.getMessage()));
+    }
+
+    @ExceptionHandler(DocumentException.NotOwner.class)
+    public ResponseEntity<Map<String, String>> notOwner(DocumentException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("errorCode", "NOT_OWNER", "message", e.getMessage()));
     }
 
     @ExceptionHandler(DocumentException.BodyMismatch.class)

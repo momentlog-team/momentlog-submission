@@ -86,6 +86,14 @@ public class RecordShare {
         purgedAt = now;
     }
 
+    /** 차에서 기록을 지웠을 때. 링크를 바로 닫고(만료 시각을 지금으로) 본문·진술·장소를 지운다. */
+    public void revoke(Instant now) {
+        if (expiresAt.isAfter(now)) {
+            expiresAt = now;
+        }
+        purge(now);
+    }
+
     /** 진술·장소까지 같은 공유인지. 같으면 새로 만들지 않고 재사용한다. */
     public boolean hasSameContent(String statementJson, String placeText) {
         return Objects.equals(this.statementJson, statementJson) && Objects.equals(this.placeText, placeText);

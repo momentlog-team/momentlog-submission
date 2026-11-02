@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import team.momentlog.core.RecordHasher;
+import team.momentlog.server.device.application.DeviceService;
 import team.momentlog.server.document.infrastructure.RecordShareJpaRepository;
 import team.momentlog.server.document.infrastructure.ReportJpaRepository;
 import team.momentlog.server.document.infrastructure.VerifyLogJpaRepository;
@@ -37,6 +38,8 @@ public class DocumentService {
     private final RecordShareJpaRepository recordShareJpaRepository;
     private final ReportJpaRepository reportJpaRepository;
     private final VerifyLogJpaRepository verifyLogJpaRepository;
+    private final DeviceService deviceService;
+    private final ReportService reportService;
     private final Clock clock;
     private final Duration shareTtl;
     private final byte[] tokenKey;
@@ -45,6 +48,8 @@ public class DocumentService {
                            RecordShareJpaRepository recordShareJpaRepository,
                            ReportJpaRepository reportJpaRepository,
                            VerifyLogJpaRepository verifyLogJpaRepository,
+                           DeviceService deviceService,
+                           ReportService reportService,
                            Clock clock,
                            @Value("${momentlog.share.ttl:P30D}") Duration shareTtl,
                            @Value("${momentlog.share.token-secret:}") String tokenSecret) {
@@ -52,6 +57,8 @@ public class DocumentService {
         this.recordShareJpaRepository = recordShareJpaRepository;
         this.reportJpaRepository = reportJpaRepository;
         this.verifyLogJpaRepository = verifyLogJpaRepository;
+        this.deviceService = deviceService;
+        this.reportService = reportService;
         this.clock = clock;
         this.shareTtl = shareTtl;
         this.tokenKey = tokenSecret.isBlank() ? randomKey() : tokenSecret.getBytes(StandardCharsets.UTF_8);
@@ -92,6 +99,31 @@ public class DocumentService {
                 shareId, sha256(token.getBytes(StandardCharsets.UTF_8)), recordId, body,
                 statementJson, placeText, now, now.plus(shareTtl)));
         return new CreatedShare(share, token, true);
+    }
+
+    /**
+     * 차에서 기록을 지웠을 때 그 기록의 공유를 모두 철회한다. 기록을 봉인한 기기만 할 수 있다.
+     * 링크는 바로 닫히고(410), 원본 본문·진술·장소와 PDF 파일을 지운다.
+     * 이미 건넨 PDF의 원본 확인은 계속 되도록 문서 지문(t_report)과 봉인은 보관 기간(3년)까지 남긴다.
+     *
+     * @return 철회한 공유 수. 이미 철회했으면 0
+     */
+    @Transactional
+    public int revokeShares(String recordId, String deviceId, String deviceToken) {
+        deviceService.authenticate(deviceId, deviceToken);
+        RecordSeal seal = recordSealJpaRepository.findById(recordId)
+                .orElseThrow(() -> new DocumentException.SealNotFound(recordId));
+        if (!deviceId.equals(seal.getDeviceId())) {
+            throw new DocumentException.NotOwner(recordId);
+        }
+        Instant now = Instant.now(clock);
+        int revoked = 0;
+        for (RecordShare share : recordShareJpaRepository.findByRecordIdAndPurgedAtIsNull(recordId)) {
+            reportJpaRepository.findByShareId(share.getShareId()).forEach(report -> reportService.deleteFile(report.getStorageKey()));
+            share.revoke(now);
+            revoked++;
+        }
+        return revoked;
     }
 
     /** 문서 번호로 발급 PDF를 찾아 제출된 해시와 대조하고, 결과와 무관하게 이력을 남긴다. */

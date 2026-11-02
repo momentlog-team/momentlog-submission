@@ -9,8 +9,10 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import team.momentlog.server.device.api.DeviceHeaders;
 import team.momentlog.server.record.application.RecordSealService;
 import team.momentlog.server.record.application.SealConflictException;
 import team.momentlog.server.record.application.VerifyResult;
@@ -31,11 +33,13 @@ public class RecordSealController {
 
     /** 차량 앱이 기록 저장 직후 원본 해시를 봉인한다. */
     @Operation(summary = "원본 해시 봉인",
-            description = "차량 앱이 기록 저장 직후 호출. 해시와 서버 시각을 고정하고, deviceId가 있으면 기기를 등록·갱신한다. 같은 해시 재전송은 처음 봉인을 돌려주고, 다른 해시는 409.")
+            description = "차량 앱이 기록 저장 직후 호출. 해시와 서버 시각을 고정하고, deviceId가 있으면 기기를 등록·갱신한다. 같은 해시 재전송은 처음 봉인을 돌려주고, 다른 해시는 409. "
+                    + "X-Device-Token 헤더가 있으면 기기를 확인한다(처음 보는 토큰은 등록, 다르면 401). 토큰이 묶인 기기 ID를 토큰 없이 쓰면 401.")
     @PostMapping("/{recordId}/seal")
     public RecordSealResponse.SealDetail seal(@PathVariable String recordId,
+                                              @RequestHeader(name = DeviceHeaders.DEVICE_TOKEN, required = false) String deviceToken,
                                               @Valid @RequestBody RecordSealRequest.Seal request) {
-        RecordSeal seal = recordSealService.seal(recordId, request.deviceId(), request.sha256(), request.formatVersion(), request.deviceCreatedAt());
+        RecordSeal seal = recordSealService.seal(recordId, request.deviceId(), deviceToken, request.sha256(), request.formatVersion(), request.deviceCreatedAt());
         return RecordSealResponse.SealDetail.from(seal);
     }
 
