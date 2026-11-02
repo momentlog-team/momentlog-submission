@@ -9,7 +9,7 @@ import java.time.Instant;
 
 /**
  * 발급한 사고 정리 PDF. 문서 번호(SG-YYYYMMDD-HHMMSS)로 찾고, 제출된 PDF의 해시를 [pdfSha256]과 대조한다(09 원본 대조 화면).
- * PDF 생성은 아직 없다. 발급 기능이 붙으면 여기에 한 건씩 남긴다.
+ * 원본 확인 화면이 공유 본문(30일 뒤 삭제) 없이도 열리도록, 화면에 쓰는 일시·경위 첫 문장·장소를 발급할 때 복사해 둔다.
  */
 @Entity
 @Table(name = "t_report")
@@ -46,11 +46,23 @@ public class Report {
     @Column(name = "issued_at", nullable = false)
     private Instant issuedAt;
 
+    /** 기록의 감지 시각(0초). 원본 확인 화면 표시용. */
+    @Column(name = "record_at")
+    private Instant recordAt;
+
+    /** 경위 첫 문장. 원본 확인 화면 표시용. */
+    @Column(name = "record_lead", length = 255)
+    private String recordLead;
+
+    @Column(name = "place_text", length = 255)
+    private String placeText;
+
     protected Report() {
     }
 
     private Report(String reportId, String documentNo, String shareId, String recordId, String pdfSha256,
-                   String fileName, int byteSize, int pageCount, String storageKey, Instant issuedAt) {
+                   String fileName, int byteSize, int pageCount, String storageKey, Instant issuedAt,
+                   Instant recordAt, String recordLead, String placeText) {
         this.reportId = reportId;
         this.documentNo = documentNo;
         this.shareId = shareId;
@@ -61,12 +73,16 @@ public class Report {
         this.pageCount = pageCount;
         this.storageKey = storageKey;
         this.issuedAt = issuedAt;
+        this.recordAt = recordAt;
+        this.recordLead = recordLead;
+        this.placeText = placeText;
     }
 
     public static Report issue(String reportId, String documentNo, String shareId, String recordId, String pdfSha256,
-                               String fileName, int byteSize, int pageCount, String storageKey, Instant issuedAt) {
+                               String fileName, int byteSize, int pageCount, String storageKey, Instant issuedAt,
+                               Instant recordAt, String recordLead, String placeText) {
         return new Report(reportId, documentNo, shareId, recordId, pdfSha256.toLowerCase(),
-                fileName, byteSize, pageCount, storageKey, issuedAt);
+                fileName, byteSize, pageCount, storageKey, issuedAt, recordAt, recordLead, placeText);
     }
 
     public boolean matches(String candidateSha256) {
@@ -111,5 +127,17 @@ public class Report {
 
     public Instant getIssuedAt() {
         return issuedAt;
+    }
+
+    public Instant getRecordAt() {
+        return recordAt;
+    }
+
+    public String getRecordLead() {
+        return recordLead;
+    }
+
+    public String getPlaceText() {
+        return placeText;
     }
 }

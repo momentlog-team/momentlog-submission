@@ -14,6 +14,15 @@ spring:
       ddl-auto: update
     open-in-view: false
 
+# 보관 기간(ISO-8601). 2026-11-02 결정: 공유 본문·PDF 30일, 문서 지문·봉인 3년, 확인 이력 90일
+momentlog:
+  share:
+    ttl: P30D
+  retention:
+    proof-ttl: P1095D
+    verify-log-ttl: P90D
+    cron: "0 30 4 * * *"
+
 springdoc:
   packages-to-scan: team.momentlog.server
   default-consumes-media-type: application/json;charset=UTF-8

@@ -22,7 +22,7 @@ Light·Wiper·Airbag ────────┼─▶ SignalSource ─▶ Signa
                                                        QR 확인 페이지 ──▶ POST /api/v1/records/{id}/verify
 ```
 
-- 위치·조작 내역은 차 안에만 둔다. 서버에는 해시만 간다.
+- 위치·조작 내역은 차 안에 둔다. 서버에는 봉인 해시만 간다. 단 QR 화면을 연 기록만 원본과 진술을 올리고(공유), 공유 만료 뒤 서버가 지운다(아래 보관 기간).
 - 시연(`ReplaySource`)과 실차(`VehicleSignalClient`)는 같은 `SignalState`를 채우므로 기록 로직은 하나다.
 
 ## 모듈
@@ -32,6 +32,17 @@ Light·Wiper·Airbag ────────┼─▶ SignalSource ─▶ Signa
 | `core` | Kotlin(JVM) | Android 의존 없음. 단위 테스트로 검증 |
 | `app` | Kotlin(Android) | SDK 연결, 포그라운드 서비스, 화면 |
 | `server` | Java 17, Spring Boot | `record` 도메인: api / application / model / infrastructure |
+
+## 보관 기간 (2026-11-02 결정)
+
+| 데이터 | 기간 | 처리 |
+|---|---|---|
+| QR 링크, 공유 원본 본문·진술·장소, PDF 파일 | 30일 (`momentlog.share.ttl`) | 링크는 410. 본문·진술·장소를 비우고 PDF 파일을 지운다 |
+| 발급 문서 지문(`t_report`), 원본 봉인(`t_record_seal`) | 3년 (`momentlog.retention.proof-ttl`) | 이 기간 동안 원본 확인(`/v/{문서번호}`)이 된다. 봉인은 그 기록의 공유·문서가 다 지워진 뒤 지운다 |
+| 원본 확인 이력(`t_verify_log`) | 90일 (`momentlog.retention.verify-log-ttl`) | 행 삭제 |
+| 차 안의 사고 아닌 기록 | 감지 시각부터 7일 | 앱 `RecordStore.purgeExpired` |
+
+서버 정리는 `RetentionService`가 매일 04:30(한국 시각)에 한다.
 
 ## 기준값 (1차, 실측 후 조정)
 

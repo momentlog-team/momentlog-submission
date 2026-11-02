@@ -86,19 +86,18 @@ public class ReportService {
         write(storageKey, pdf);
         Report report = reportJpaRepository.save(Report.issue(reportId, documentNo, share.getShareId(), share.getRecordId(),
                 DocumentService.sha256(pdf), "순간기록_" + facts.stamp().replace('-', '_') + ".pdf",
-                pdf.length, 1, storageKey, now));
+                pdf.length, 1, storageKey, now, facts.triggerAt().toInstant(), facts.lead(), share.getPlaceText()));
         return new IssuedPdf(report, pdf);
     }
 
-    /** 09 원본 대조 페이지가 보여 줄 문서. 없으면 null. */
+    /**
+     * 09 원본 대조 페이지가 보여 줄 문서. 없으면 null.
+     * 공유 본문은 30일 뒤 지워지므로 t_report에 복사해 둔 값과 봉인만 쓴다.
+     */
     @Transactional(readOnly = true)
     public VerifyTarget verifyTarget(String documentNo) {
         return reportJpaRepository.findByDocumentNo(documentNo)
-                .map(report -> {
-                    RecordShare share = recordShareJpaRepository.findById(report.getShareId()).orElseThrow();
-                    RecordSeal seal = recordSealJpaRepository.findById(report.getRecordId()).orElseThrow();
-                    return new VerifyTarget(report, seal, facts(share), share.getPlaceText());
-                })
+                .map(report -> new VerifyTarget(report, recordSealJpaRepository.findById(report.getRecordId()).orElseThrow()))
                 .orElse(null);
     }
 
@@ -108,7 +107,7 @@ public class ReportService {
     public record IssuedPdf(Report report, byte[] bytes) {
     }
 
-    public record VerifyTarget(Report report, RecordSeal seal, ReportFacts facts, String placeText) {
+    public record VerifyTarget(Report report, RecordSeal seal) {
     }
 
     private RecordShare findShare(String token) {
@@ -139,6 +138,15 @@ public class ReportService {
         try {
             Files.createDirectories(reportDir);
             Files.write(reportDir.resolve(storageKey), bytes);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /** 보관 기간이 지난 PDF 파일을 지운다. 이미 없으면 그냥 넘어간다. */
+    public void deleteFile(String storageKey) {
+        try {
+            Files.deleteIfExists(reportDir.resolve(storageKey));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
