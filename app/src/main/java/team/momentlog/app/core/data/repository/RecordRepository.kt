@@ -31,6 +31,7 @@ import team.momentlog.core.RecordHasher
  */
 class RecordRepository(context: Context) {
 
+    val changes = RecordStore.changes
     private val store = RecordStore(context)
     private val api: RecordApi by lazy { ApiInfo.create(RecordApi::class.java) }
     private val mockMutex = Mutex()

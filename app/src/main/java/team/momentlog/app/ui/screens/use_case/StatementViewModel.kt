@@ -18,9 +18,10 @@ import team.momentlog.app.record.RecordStore
  */
 class StatementViewModel(application: Application) : BaseViewModel(application) {
 
-    enum class Step { ASK, LISTENING, CONFIRM, LATER }
+    enum class Step { ASK, LISTENING, CONFIRM, EDITING, LATER }
 
     private val recordRepository = RecordRepository(application)
+    private var loadJob: Job? = null
     private var recordId: String? = null
     private val voice = StatementVoice(application)
     private var finishJob: Job? = null
@@ -54,16 +55,63 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
     private val _plate = MutableStateFlow<String?>(null)
     val plate: StateFlow<String?> = _plate
 
+    private val _editText = MutableStateFlow("")
+    val editText: StateFlow<String> = _editText
+    private val _editPlate = MutableStateFlow("")
+    val editPlate: StateFlow<String> = _editPlate
+
+    fun edit() {
+        loadJob?.cancel()
+        stopVoice()
+        _editText.value = _transcript.value
+        _editPlate.value = _plate.value.orEmpty()
+        _voiceError.value = null
+        _step.value = Step.EDITING
+    }
+
+    fun updateEditText(text: String) { _editText.value = text }
+    fun updateEditPlate(text: String) { _editPlate.value = text }
+
+    fun confirmEdit() {
+        if (_editText.value.isBlank()) {
+            _voiceError.value = "진술 내용을 입력해 주세요."
+            return
+        }
+        applyEdit()
+        _voiceError.value = null
+        _step.value = Step.CONFIRM
+    }
+
+    fun cancelEdit() {
+        _voiceError.value = null
+        _step.value = if (_transcript.value.isBlank()) Step.ASK else Step.CONFIRM
+    }
+
+    private fun applyEdit() {
+        _transcript.value = _editText.value.trim()
+        _plate.value = _editPlate.value.trim().takeIf { it.isNotEmpty() }
+    }
+
     fun start(recordId: String) {
         if (this.recordId == recordId && _step.value != Step.LATER) return
+        loadJob?.cancel()
         stopVoice()
         this.recordId = recordId
         _voiceError.value = null
         _step.value = Step.ASK
         clear()
+        loadJob = viewModelScope.launch {
+            val saved = recordRepository.getRecord(recordId)
+            if (this@StatementViewModel.recordId == recordId && _step.value == Step.ASK && saved?.statement?.isNotBlank() == true) {
+                _transcript.value = saved.statement
+                _plate.value = saved.plate
+                _step.value = Step.CONFIRM
+            }
+        }
     }
 
     fun speak() {
+        loadJob?.cancel()
         stopVoice()
         clear()
         _voiceError.value = null
@@ -107,7 +155,8 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
 
     fun leaveScreen() {
         stopVoice()
-        if (_step.value == Step.LISTENING) {
+        if (_step.value == Step.LISTENING || _step.value == Step.EDITING) {
+            if (_step.value == Step.EDITING) applyEdit()
             if (_partial.value.isNotBlank()) onFinal(_partial.value)
             val id = recordId
             val text = _transcript.value
@@ -157,6 +206,7 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
     }
 
     fun later() {
+        loadJob?.cancel()
         val id = recordId ?: return
         stopVoice()
         _step.value = Step.LATER
@@ -168,11 +218,14 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
     /** 진술 중 출발하면 받아 적은 데까지 저장한다. */
     fun saveInterrupted() {
         val id = recordId ?: return
-        if (_step.value != Step.LISTENING) return
+        if (_step.value != Step.LISTENING && _step.value != Step.EDITING) return
+        if (_step.value == Step.EDITING) applyEdit()
         stopVoice()
         if (_partial.value.isNotBlank()) onFinal(_partial.value)
+        val text = _transcript.value
+        val plate = _plate.value
         viewModelScope.launch {
-            recordRepository.saveStatement(id, _transcript.value, _plate.value, RecordStore.StatementState.WRITING)
+            recordRepository.saveStatement(id, text, plate, RecordStore.StatementState.WRITING)
         }
         recordId = null
         _step.value = Step.ASK

@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import team.momentlog.app.record.RecordStore
-import team.momentlog.app.record.SealClient
+import team.momentlog.app.record.SealRetryQueue
 import team.momentlog.app.signal.VehicleSignalClient
 import team.momentlog.app.signal.ReplaySource
 import team.momentlog.app.signal.SignalSource
@@ -46,7 +46,7 @@ class RecorderService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var store: RecordStore
-    private lateinit var sealClient: SealClient
+    private lateinit var sealQueue: SealRetryQueue
     private var source: SignalSource? = null
 
     private val tick = object : Runnable {
@@ -65,7 +65,7 @@ class RecorderService : Service() {
     override fun onCreate() {
         super.onCreate()
         store = RecordStore(this)
-        sealClient = SealClient(BuildConfig.SEAL_SERVER)
+        sealQueue = SealRetryQueue(this, io).also { it.start() }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -159,7 +159,7 @@ class RecorderService : Service() {
                 if (capture.atMillis == captureAtMillis) capture.copy(recordId = record.id) else capture
             }
             store.delete(record.mergedRecordIds)
-            if (sealClient.seal(record.id, sha, record.triggerAtMillis)) store.markSealed(record.id)
+            sealQueue.request()
             _lastSavedId.value = record.id
         }
     }
@@ -167,6 +167,7 @@ class RecorderService : Service() {
     override fun onDestroy() {
         handler.removeCallbacks(tick)
         source?.stop()
+        sealQueue.stop()
         io.cancel()
         _status.value = Status.STOPPED
         _live.value = null

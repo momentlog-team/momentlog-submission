@@ -55,7 +55,7 @@ fun MomentlogApp(viewModels: AppViewModels) {
 
     LaunchedEffect(isDriving) {
         if (isDriving && currentRoute != null && currentRoute != Routes.HOME) {
-            resumeReason = if (currentRoute == Routes.STATEMENT && statementStep == StatementViewModel.Step.LISTENING) {
+            resumeReason = if (currentRoute == Routes.STATEMENT && statementStep in listOf(StatementViewModel.Step.LISTENING, StatementViewModel.Step.EDITING)) {
                 viewModels.statement.saveInterrupted()
                 ResumeReason.STATEMENT
             } else {

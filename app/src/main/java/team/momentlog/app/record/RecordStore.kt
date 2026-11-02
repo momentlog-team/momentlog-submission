@@ -1,5 +1,8 @@
 package team.momentlog.app.record
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import android.util.AtomicFile
 import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
@@ -21,7 +24,7 @@ import java.io.File
 class RecordStore(context: Context) {
     private val dir = File(context.filesDir, "records").apply { mkdirs() }
 
-    fun save(record: IncidentRecord, sha256: String, savedWhileParked: Boolean = false) {
+    fun save(record: IncidentRecord, sha256: String, savedWhileParked: Boolean = false) = synchronized(lock) {
         val json = JSONObject()
             .put("id", record.id)
             .put("trigger", record.trigger.name)
@@ -32,7 +35,7 @@ class RecordStore(context: Context) {
             .put("events", JSONArray().apply { record.events.forEach { put(JSONObject().put("trigger", it.trigger.name).put("t", it.atMillis)) } })
             .put("merged", JSONArray(record.mergedRecordIds))
             .put("snapshots", JSONArray().apply { record.snapshots.forEach { put(it.toJson()) } })
-        File(dir, "${record.id}.json").writeText(json.toString())
+        write(File(dir, "${record.id}.json"), json)
     }
 
     fun markSealed(id: String) = update(id) { put("sealed", true) }
@@ -43,28 +46,30 @@ class RecordStore(context: Context) {
         put("statementState", state.name)
     }
 
+    fun markSealRejected(id: String) = update(id) { put("sealRejected", true) }
+
     fun retain(id: String) = update(id) { put("retained", true) }
 
     /** 다른 기록에 합쳐진 앞선 기록을 지운다. 합친 기록이 그 구간과 감지를 그대로 담고 있다. */
-    fun delete(ids: List<String>) = ids.forEach { File(dir, "$it.json").delete() }
+    fun delete(ids: List<String>) = synchronized(lock) { ids.forEach { AtomicFile(File(dir, "$it.json")).delete() } }
 
     /** 보관 대상이 아닌데 보관 기간이 지난 기록을 지운다. */
-    fun purgeExpired(nowMillis: Long) {
-        dir.listFiles { f -> f.extension == "json" }.orEmpty().forEach { file ->
-            val saved = load(JSONObject(file.readText()))
-            if (!saved.isKept && nowMillis >= saved.deleteAtMillis) file.delete()
+    fun purgeExpired(nowMillis: Long) = synchronized(lock) {
+        recordFiles().forEach { file ->
+            val saved = load(JSONObject(AtomicFile(file).readFully().toString(Charsets.UTF_8)))
+            if (!saved.isKept && nowMillis >= saved.deleteAtMillis) AtomicFile(file).delete()
         }
     }
 
-    private fun update(id: String, change: JSONObject.() -> Unit) {
+    private fun update(id: String, change: JSONObject.() -> Unit) = synchronized(lock) {
         val file = File(dir, "$id.json")
-        if (!file.exists()) return
-        file.writeText(JSONObject(file.readText()).apply(change).toString())
+        if (!file.exists() && !File(dir, "$id.json.bak").exists()) return@synchronized
+        write(file, JSONObject(AtomicFile(file).readFully().toString(Charsets.UTF_8)).apply(change))
     }
 
-    fun list(): List<Saved> = dir.listFiles { f -> f.extension == "json" }.orEmpty()
-        .map { load(JSONObject(it.readText())) }
-        .sortedByDescending { it.record.triggerAtMillis }
+    fun list(): List<Saved> = synchronized(lock) { recordFiles()
+        .map { load(JSONObject(AtomicFile(it).readFully().toString(Charsets.UTF_8))) }
+        .sortedByDescending { it.record.triggerAtMillis } }
 
     enum class StatementState { NONE, LATER, WRITING, DONE }
 
@@ -72,6 +77,7 @@ class RecordStore(context: Context) {
         val record: IncidentRecord,
         val sha256: String,
         val sealed: Boolean,
+        val sealRejected: Boolean = false,
         val savedWhileParked: Boolean = false,
         val statement: String? = null,
         val plate: String? = null,
@@ -83,6 +89,30 @@ class RecordStore(context: Context) {
             get() = retained || record.trigger == Trigger.AIRBAG || statementState == StatementState.DONE
 
         val deleteAtMillis: Long get() = record.triggerAtMillis + Constant.RETENTION_DAYS * 24 * 60 * 60 * 1000L
+    }
+
+    private fun recordFiles(): List<File> = dir.listFiles().orEmpty()
+        .filter { it.extension == "json" || it.name.endsWith(".json.bak") }
+        .map { if (it.name.endsWith(".bak")) File(dir, it.name.removeSuffix(".bak")) else it }
+        .distinctBy { it.name }
+
+    private fun write(file: File, json: JSONObject) {
+        val atomic = AtomicFile(file)
+        val stream = atomic.startWrite()
+        try {
+            stream.write(json.toString().toByteArray(Charsets.UTF_8))
+            atomic.finishWrite(stream)
+            _changes.value += 1
+        } catch (error: Throwable) {
+            atomic.failWrite(stream)
+            throw error
+        }
+    }
+
+    companion object {
+        private val lock = Any()
+        private val _changes = MutableStateFlow(0L)
+        val changes: StateFlow<Long> = _changes
     }
 
     private fun load(o: JSONObject): Saved {
@@ -98,6 +128,7 @@ class RecordStore(context: Context) {
             record = IncidentRecord(o.getString("id"), trigger, triggerAt, snaps, events, merged),
             sha256 = o.getString("sha256"),
             sealed = o.optBoolean("sealed", false),
+            sealRejected = o.optBoolean("sealRejected", false),
             savedWhileParked = o.optBoolean("parked", false),
             statement = o.optNullable("statement") { getString(it) },
             plate = o.optNullable("plate") { getString(it) },

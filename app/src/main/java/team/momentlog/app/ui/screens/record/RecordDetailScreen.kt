@@ -230,10 +230,10 @@ private fun StatementBlock(record: RecordInfo, size: Int, lineHeight: Int, plate
     val colors = LocalAppColors.current
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text("진술 · 운전자", style = textStyle(20, 26, FontWeight.Bold, colors.textTertiary))
-        if (record.needsStatement) {
+        run {
             Spacer(Modifier.width(20.q))
             Text(
-                "진술 남기기",
+                if (record.statement.isNullOrBlank()) "진술 남기기" else "진술 고치기",
                 style = textStyle(24, 32, FontWeight.Bold, colors.accent),
                 modifier = Modifier.clickable(onClick = onStatement).padding(8.q),
             )

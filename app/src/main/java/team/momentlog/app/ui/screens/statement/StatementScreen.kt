@@ -29,11 +29,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -91,6 +96,8 @@ fun StatementScreen(
     val voiceError by statementViewModel.voiceError.collectAsState()
     val ready by statementViewModel.ready.collectAsState()
     val level by statementViewModel.level.collectAsState()
+    val editText by statementViewModel.editText.collectAsState()
+    val editPlate by statementViewModel.editPlate.collectAsState()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val microphonePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -118,6 +125,33 @@ fun StatementScreen(
     val split = isSplit
     val kind = record?.kind ?: RecordKind.HARD_STOP
     val tone = kind.tone(colors)
+
+    if (step == Step.EDITING) {
+        AppScreen(drivingAllowed = false) {
+            Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(48.q), verticalArrangement = Arrangement.spacedBy(20.q)) {
+                Text("진술 고치기", style = textStyle(44, 56, FontWeight.Bold))
+                val fieldColors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
+                    focusedBorderColor = colors.accent, unfocusedBorderColor = colors.line,
+                    focusedLabelColor = colors.accent, unfocusedLabelColor = colors.textSecondary,
+                    cursorColor = colors.accent,
+                )
+                OutlinedTextField(editText, statementViewModel::updateEditText,
+                    modifier = Modifier.fillMaxWidth(), label = { Text("진술 내용") },
+                    minLines = 3, textStyle = textStyle(28, 38), colors = fieldColors)
+                OutlinedTextField(editPlate, statementViewModel::updateEditPlate,
+                    modifier = Modifier.fillMaxWidth(), label = { Text("상대 차량 번호 (선택)") },
+                    singleLine = true, textStyle = textStyle(28, 38), colors = fieldColors)
+                voiceError?.let { Text(it, style = textStyle(24, 32, color = colors.warning)) }
+                Row(horizontalArrangement = Arrangement.spacedBy(16.q)) {
+                    CustomButton("수정 확인", statementViewModel::confirmEdit, primary = true)
+                    CustomButton("취소", statementViewModel::cancelEdit)
+                }
+                Text("수정 확인 후 ‘이대로 저장’을 누르면 저장돼요", style = textStyle(24, 32, color = colors.textSecondary))
+            }
+        }
+        return
+    }
 
     AppScreen(drivingAllowed = false) {
         RoadStage(
@@ -154,6 +188,7 @@ fun StatementScreen(
             when (step) {
                 Step.ASK -> Ask()
                 Step.LISTENING -> Listening(transcript, partial, ready, level)
+                Step.EDITING -> Unit
                 Step.CONFIRM -> Confirm(transcript, plate)
                 Step.LATER -> Later()
             }
@@ -172,11 +207,12 @@ fun StatementScreen(
                 Triple("다 말했어요", AppIcon.OK, statementViewModel::finishSpeaking),
                 Triple("처음부터", AppIcon.REDO, statementViewModel::restart),
             )
-            // TODO(앱): "고치기"는 정차 중 키보드 입력 화면으로 연결
             Step.CONFIRM -> listOf(
                 Triple("이대로 저장", AppIcon.OK, { statementViewModel.save(onSaved) }),
+                Triple("고치기", null, statementViewModel::edit),
                 Triple("다시 말하기", AppIcon.REDO, statementViewModel::restart),
             )
+            Step.EDITING -> emptyList()
             Step.LATER -> listOf(
                 Triple("기록 보기", AppIcon.LIST, onOpenRecords),
                 Triple("닫기", null, onClose),

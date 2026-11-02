@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import team.momentlog.app.RecorderService
 import team.momentlog.app.core.data.repository.RecordRepository
 import team.momentlog.app.ui.models.RecordInfo
 import team.momentlog.core.IncidentNarrator
@@ -43,7 +42,10 @@ class RecordViewModel(application: Application) : BaseViewModel(application) {
 
     init {
         viewModelScope.launch {
-            RecorderService.lastSavedId.collect { loadRecords() }
+            recordRepository.changes.collect {
+                loadRecords()
+                _selected.value?.id?.let(::loadRecord)
+            }
         }
     }
 

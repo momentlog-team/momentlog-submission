@@ -32,6 +32,8 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+    testOptions.unitTests.all { it.useJUnitPlatform() }
+
     buildFeatures {
         compose = true
         buildConfig = true
@@ -39,6 +41,9 @@ android {
 }
 
 dependencies {
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.3")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.10.3")
     implementation(project(":core"))
 
     implementation("ai.pleos.playground:Vehicle:2.3.2")

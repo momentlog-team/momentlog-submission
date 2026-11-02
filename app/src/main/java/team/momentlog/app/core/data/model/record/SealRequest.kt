@@ -5,4 +5,5 @@ data class SealRequest(
     val sha256: String,
     val formatVersion: Int,
     val deviceCreatedAt: String,
+    val deviceId: String,
 )
