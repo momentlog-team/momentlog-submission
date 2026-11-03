@@ -23,6 +23,7 @@ import team.momentlog.app.record.SealRetryQueue
 import team.momentlog.app.signal.VehicleSignalClient
 import team.momentlog.app.signal.ReplaySource
 import team.momentlog.app.signal.SignalSource
+import team.momentlog.app.signal.AccelerationReader
 import team.momentlog.app.voice.GleoRecordAction
 import team.momentlog.core.CaptureWindow
 import team.momentlog.core.IncidentEvent
@@ -48,6 +49,7 @@ class RecorderService : Service() {
     private lateinit var store: RecordStore
     private lateinit var sealQueue: SealRetryQueue
     private var source: SignalSource? = null
+    private val acceleration by lazy { AccelerationReader(this, handler) }
 
     private val tick = object : Runnable {
         override fun run() {
@@ -93,12 +95,22 @@ class RecorderService : Service() {
         val replay = intent?.getBooleanExtra(EXTRA_REPLAY, false) == true
         startForegroundCompat(if (replay) "시연 데이터로 기록 중" else "최근 3분을 기록하고 있어요")
 
+        acceleration.stop()
         source?.stop()
         source = (if (replay) ReplaySource() else VehicleSignalClient(this)).also { s ->
             s.onAirbagDeployed = { trigger(Trigger.AIRBAG) }
             s.start(state)
         }
         _status.value = if (replay) Status.REPLAYING else Status.RECORDING
+        if (!replay) acceleration.start { atMillis, forward, right ->
+            val wasCapturing = recorder.isCapturing
+            recorder.onAcceleration(atMillis, forward, right)
+            if (!wasCapturing && recorder.isCapturing) {
+                onCaptureStarted(recorder.pendingTrigger ?: Trigger.IMPACT, state.snapshot(atMillis))
+            } else if (recorder.isCapturing) {
+                _capture.value = _capture.value?.copy(events = recorder.pendingEvents)
+            }
+        }
         handler.removeCallbacks(tick)
         handler.post(tick)
         // 꺼져 있을 때 "기록해"가 오면 켜자마자 기록한다(버퍼가 비어 있어 직전 기록은 없다).
@@ -166,6 +178,7 @@ class RecorderService : Service() {
 
     override fun onDestroy() {
         handler.removeCallbacks(tick)
+        acceleration.stop()
         source?.stop()
         sealQueue.stop()
         io.cancel()
