@@ -49,6 +49,7 @@ import team.momentlog.app.config.theme.isSplit
 import team.momentlog.app.config.theme.q
 import team.momentlog.app.config.theme.textStyle
 import team.momentlog.app.ui.common.CustomButton
+import team.momentlog.app.ui.common.RecoveryPanel
 import team.momentlog.app.ui.models.Formats
 import team.momentlog.app.ui.models.RecordInfo
 import team.momentlog.app.ui.models.RecordKind
@@ -95,6 +96,8 @@ fun RecordDetailScreen(
     LaunchedEffect(recordId) { recordViewModel.loadRecord(recordId) }
     val record by recordViewModel.selected.collectAsState()
     val current = record?.takeIf { it.id == recordId }
+    val loadedId by recordViewModel.loadedId.collectAsState()
+    val loadFailure by recordViewModel.recordFailure.collectAsState()
     var confirmDelete by remember(recordId) { mutableStateOf(false) }
     val failure by recordViewModel.failure.collectAsState()
     if (confirmDelete) AlertDialog(
@@ -107,7 +110,11 @@ fun RecordDetailScreen(
 
     AppScreen(drivingAllowed = false) {
         if (current == null) {
-            Text("기록을 불러오고 있어요", style = textStyle(30, 42, color = LocalAppColors.current.textSecondary), modifier = Modifier.align(Alignment.Center))
+            RecoveryPanel(
+                if (loadedId != recordId) "기록을 불러오고 있어요" else loadFailure ?: "기록이 삭제되었거나 보관 기간이 지났어요.",
+                "기록 목록으로", onOpenRecords, Modifier.align(Alignment.Center),
+                onRetry = if (loadedId == recordId) ({ recordViewModel.loadRecord(recordId) }) else null,
+            )
             return@AppScreen
         }
         var replayKey by remember(current.id) { mutableIntStateOf(0) }

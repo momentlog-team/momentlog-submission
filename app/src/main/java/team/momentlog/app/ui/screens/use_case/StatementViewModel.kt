@@ -8,8 +8,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import team.momentlog.app.record.StatementWriteOrder
 import team.momentlog.app.voice.StatementVoice
 import team.momentlog.app.core.data.repository.RecordRepository
 import team.momentlog.app.record.RecordStore
@@ -26,8 +25,13 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
     private val recordRepository = RecordRepository(application)
     private var loadJob: Job? = null
     private var recordId: String? = null
-    private val persistenceMutex = Mutex()
+    private val writeOrder = StatementWriteOrder()
+    private var revision = 0L
+    private val _recordAvailable = MutableStateFlow<Boolean?>(null)
+    val recordAvailable: StateFlow<Boolean?> = _recordAvailable
     private var dirty = false
+    private var pendingSpeak = false
+    private var screenActive = false
     private val voice = StatementVoice(application)
     private var finishJob: Job? = null
     private var saveJob: Job? = null
@@ -42,7 +46,7 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
     val level: StateFlow<Float> = _level
 
     fun prompt() {
-        if (_step.value == Step.ASK && promptedId != recordId) {
+        if (_recordAvailable.value == true && _step.value == Step.ASK && promptedId != recordId) {
             promptedId = recordId
             voice.prompt()
         }
@@ -95,31 +99,49 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
     }
 
     private fun applyEdit() {
+        revision++
         dirty = true
         _transcript.value = _editText.value.trim()
         _plate.value = _editPlate.value.trim().takeIf { it.isNotEmpty() }
     }
 
     fun start(recordId: String) {
-        if (this.recordId == recordId && _step.value != Step.LATER) return
+        screenActive = true
+        if (this.recordId == recordId && _step.value != Step.LATER &&
+            (_recordAvailable.value == true || loadJob?.isActive == true)) return
         loadJob?.cancel()
         stopVoice()
         this.recordId = recordId
+        pendingSpeak = false
+        revision++
         dirty = false
         _voiceError.value = null
         _step.value = Step.ASK
         clear()
+        _recordAvailable.value = null
         loadJob = viewModelScope.launch {
-            val saved = recordRepository.getRecord(recordId)
-            if (this@StatementViewModel.recordId == recordId && _step.value == Step.ASK && saved?.statement?.isNotBlank() == true) {
-                _transcript.value = saved.statement
-                _plate.value = saved.plate
-                _step.value = Step.CONFIRM
+            try {
+                val saved = recordRepository.getRecord(recordId)
+                if (this@StatementViewModel.recordId != recordId) return@launch
+                _recordAvailable.value = saved != null
+                if (saved == null) _voiceError.value = "기록이 삭제되었거나 보관 기간이 지났어요."
+                else if (_step.value == Step.ASK && saved.statement?.isNotBlank() == true) {
+                    _transcript.value = saved.statement
+                    _plate.value = saved.plate
+                    _step.value = Step.CONFIRM
+                }
+                if (saved != null && pendingSpeak) { pendingSpeak = false; speak() }
+            } catch (error: CancellationException) { throw error }
+            catch (error: Exception) {
+                _recordAvailable.value = false
+                _voiceError.value = "기록을 불러오지 못했어요. 다시 시도해 주세요."
             }
         }
     }
 
     fun speak() {
+        if (_recordAvailable.value == null) { pendingSpeak = true; return }
+        if (_recordAvailable.value != true) return
         loadJob?.cancel()
         stopVoice()
         clear()
@@ -164,7 +186,11 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
         _level.value = 0f
     }
 
-    fun leaveScreen() {
+    fun leaveScreen(expectedId: String? = null) {
+        if (expectedId != null && expectedId != recordId) return
+        screenActive = false
+        pendingSpeak = false
+        if (_recordAvailable.value == null) loadJob?.cancel()
         stopVoice()
         if (_step.value in listOf(Step.LISTENING, Step.EDITING, Step.CONFIRM)) {
             if (_step.value == Step.EDITING) applyEdit()
@@ -181,6 +207,7 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
     }
 
     fun onFinal(text: String) {
+        revision++
         dirty = true
         _transcript.value = listOf(_transcript.value, text).filter { it.isNotBlank() }.joinToString(" ")
         _partial.value = ""
@@ -211,21 +238,24 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
         if (_transcript.value.isBlank()) return
         val text = _transcript.value
         val plate = _plate.value
+        val version = revision
         saveJob = viewModelScope.launch {
             try {
-                writeStatement(id, text, plate, RecordStore.StatementState.DONE)
+                writeStatement(id, text, plate, RecordStore.StatementState.DONE, version)
                 // 이후 화면 이탈에서 완료 상태를 초안으로 덮어쓰지 않는다.
                 if (recordId == id) {
                     recordId = null
-                    onSaved()
+                    if (screenActive) onSaved()
                 }
             } catch (error: CancellationException) { throw error }
             catch (error: Exception) { _voiceError.value = "진술을 저장하지 못했어요. 다시 저장해 주세요." }
         }
     }
 
-    private suspend fun writeStatement(id: String, text: String, plate: String?, state: RecordStore.StatementState) {
-        persistenceMutex.withLock { recordRepository.saveStatement(id, text, plate, state) }
+    private suspend fun writeStatement(id: String, text: String, plate: String?, state: RecordStore.StatementState, version: Long) {
+        writeOrder.write(id, version, state == RecordStore.StatementState.DONE) {
+            recordRepository.saveStatement(id, text, plate, state)
+        }
     }
 
     private fun persistDraft() {
@@ -233,8 +263,9 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
         val text = _transcript.value
         val plate = _plate.value
         if (text.isBlank() || !dirty) return
+        val version = revision
         viewModelScope.launch {
-            try { writeStatement(id, text, plate, RecordStore.StatementState.WRITING) }
+            try { writeStatement(id, text, plate, RecordStore.StatementState.WRITING, version) }
             catch (error: CancellationException) { throw error }
             catch (error: Exception) { _voiceError.value = "받아 적은 내용을 저장하지 못했어요. 다시 저장해 주세요." }
         }
@@ -247,9 +278,10 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
         _step.value = Step.LATER
         val text = _transcript.value
         val plate = _plate.value
+        val version = revision
         viewModelScope.launch {
             try {
-                writeStatement(id, text, plate, if (text.isBlank()) RecordStore.StatementState.LATER else RecordStore.StatementState.WRITING)
+                writeStatement(id, text, plate, if (text.isBlank()) RecordStore.StatementState.LATER else RecordStore.StatementState.WRITING, version)
             } catch (error: CancellationException) { throw error }
             catch (error: Exception) { _voiceError.value = "진술 상태를 저장하지 못했어요. 다시 시도해 주세요." }
         }
@@ -264,8 +296,9 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
         if (_partial.value.isNotBlank()) onFinal(_partial.value)
         val text = _transcript.value
         val plate = _plate.value
+        val version = revision
         viewModelScope.launch {
-            try { writeStatement(id, text, plate, RecordStore.StatementState.WRITING) }
+            try { writeStatement(id, text, plate, RecordStore.StatementState.WRITING, version) }
             catch (error: CancellationException) { throw error }
             catch (error: Exception) { _voiceError.value = "진술 초안을 저장하지 못했어요." }
         }

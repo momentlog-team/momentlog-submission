@@ -9,7 +9,7 @@ object ErrorUtil {
 
     fun errorConvert(error: Throwable): Failure = when (error) {
         is HttpException -> fromHttp(error)
-        is IOException -> Failure(message = "서버에 연결할 수 없어요. 통신이 돌아오면 다시 보낼게요.")
+        is IOException -> Failure(message = "서버에 연결할 수 없어요. 연결을 확인하고 다시 시도해 주세요.")
         else -> Failure(message = error.message ?: Failure.DEFAULT_MESSAGE)
     }
 

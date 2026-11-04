@@ -1,6 +1,7 @@
 package team.momentlog.app.ui.screens.statement
 
 import android.Manifest
+import androidx.activity.compose.BackHandler
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -40,11 +41,15 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -61,6 +66,8 @@ import team.momentlog.app.config.theme.isSplit
 import team.momentlog.app.config.theme.q
 import team.momentlog.app.config.theme.textStyle
 import team.momentlog.app.ui.common.CustomButton
+import team.momentlog.app.ui.common.RecoveryPanel
+import team.momentlog.app.ui.screens.widget.layout.HomeButton
 import team.momentlog.app.ui.models.Formats
 import team.momentlog.app.ui.models.RecordInfo
 import team.momentlog.app.ui.models.RecordKind
@@ -98,13 +105,30 @@ fun StatementScreen(
     val level by statementViewModel.level.collectAsState()
     val editText by statementViewModel.editText.collectAsState()
     val editPlate by statementViewModel.editPlate.collectAsState()
+    val recordAvailable by statementViewModel.recordAvailable.collectAsState()
+    var confirmExit by remember(recordId) { mutableStateOf(false) }
+    val requestExit: () -> Unit = {
+        if (transcript.isNotBlank() || partial.isNotBlank() || step == Step.EDITING && editText.isNotBlank()) confirmExit = true
+        else { statementViewModel.leaveScreen(recordId); onClose() }
+    }
+    BackHandler {
+        if (step == Step.EDITING) statementViewModel.cancelEdit() else requestExit()
+    }
+    if (confirmExit) AlertDialog(
+        onDismissRequest = { confirmExit = false },
+        title = { Text("진술 작성을 나갈까요?") },
+        text = { Text(if (voiceError != null) "저장하지 못한 내용이 있을 수 있어요. 나가면 해당 내용이 사라질 수 있어요." else "작성 중인 내용은 초안으로 보관해요. 기록 목록에서 이어서 작성할 수 있어요.") },
+        confirmButton = { TextButton(onClick = { confirmExit = false; statementViewModel.leaveScreen(recordId); onClose() }) { Text("나가기") } },
+        dismissButton = { TextButton(onClick = { confirmExit = false }) { Text("계속 작성") } },
+    )
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val microphonePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) statementViewModel.beginRecognition()
         else if (statementViewModel.step.value == Step.LISTENING) statementViewModel.recognitionFailed("마이크 권한을 허용해야 받아쓸 수 있어요. 말하기를 눌러 다시 시도해 주세요.")
     }
-    LaunchedEffect(step, session) {
+    LaunchedEffect(step, session, recordAvailable) {
+        if (recordAvailable != true) return@LaunchedEffect
         if (step == Step.LISTENING) {
             if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                 statementViewModel.beginRecognition()
@@ -113,12 +137,13 @@ fun StatementScreen(
     }
     DisposableEffect(lifecycleOwner, recordId) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) statementViewModel.leaveScreen()
+            if (event == Lifecycle.Event.ON_STOP) statementViewModel.leaveScreen(recordId)
+            if (event == Lifecycle.Event.ON_START) statementViewModel.start(recordId)
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            statementViewModel.leaveScreen()
+            statementViewModel.leaveScreen(recordId)
         }
     }
     val colors = LocalAppColors.current
@@ -126,10 +151,24 @@ fun StatementScreen(
     val kind = record?.kind ?: RecordKind.HARD_STOP
     val tone = kind.tone(colors)
 
+    if (recordAvailable != true) {
+        AppScreen(drivingAllowed = false) {
+            RecoveryPanel(
+                if (recordAvailable == null) "기록을 불러오고 있어요" else voiceError ?: "기록을 찾을 수 없어요.",
+                "기록 목록으로", onOpenRecords, Modifier.align(Alignment.Center),
+                onRetry = if (recordAvailable == false) ({ statementViewModel.start(recordId) }) else null,
+            )
+        }
+        return
+    }
+
     if (step == Step.EDITING) {
         AppScreen(drivingAllowed = false) {
             Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(48.q), verticalArrangement = Arrangement.spacedBy(20.q)) {
-                Text("진술 고치기", style = textStyle(44, 56, FontWeight.Bold))
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("진술 고치기", style = textStyle(44, 56, FontWeight.Bold), modifier = Modifier.weight(1f))
+                    TextButton(onClick = requestExit) { Text("닫기", style = textStyle(26, 34)) }
+                }
                 val fieldColors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = colors.textPrimary, unfocusedTextColor = colors.textPrimary,
                     focusedBorderColor = colors.accent, unfocusedBorderColor = colors.line,
@@ -239,6 +278,7 @@ fun StatementScreen(
                 }
             }
         }
+        HomeButton(onClick = requestExit, modifier = Modifier.align(Alignment.TopEnd).padding(top = 32.q, end = 40.q))
     }
 }
 

@@ -51,6 +51,7 @@ import team.momentlog.app.config.theme.q
 import team.momentlog.app.config.theme.textStyle
 import team.momentlog.app.record.RecordStore
 import team.momentlog.app.ui.common.CustomButton
+import team.momentlog.app.ui.common.RecoveryPanel
 import team.momentlog.app.ui.models.Formats
 import team.momentlog.app.ui.models.RecordInfo
 import team.momentlog.app.ui.models.RecordKind
@@ -85,6 +86,7 @@ fun RecordListScreen(
 ) {
     LaunchedEffect(Unit) { recordViewModel.loadRecords() }
     val records by recordViewModel.records.collectAsState()
+    val failure by recordViewModel.failure.collectAsState()
     val selectedId by recordViewModel.focusedId.collectAsState()
     val listState = rememberLazyListState(recordViewModel.listIndex, recordViewModel.listOffset)
     LaunchedEffect(listState) {
@@ -124,7 +126,9 @@ fun RecordListScreen(
                 }
             }
             Spacer(Modifier.height(32.q))
-            if (records.isEmpty()) {
+            if (failure != null) {
+                RecoveryPanel(failure?.message ?: "기록을 불러오지 못했어요.", "홈으로", onHome, onRetry = recordViewModel::loadRecords)
+            } else if (records.isEmpty()) {
                 EmptyRecords(Modifier.fillMaxSize())
             } else {
                 LazyColumn(

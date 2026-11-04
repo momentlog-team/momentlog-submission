@@ -1,6 +1,7 @@
 package team.momentlog.app.record
 
 import java.io.File
+import java.io.IOException
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.api.Assertions.*
@@ -33,6 +34,14 @@ class RevocationOutboxTest {
         assertTrue(outbox.pending().isEmpty())
         assertThrows(IllegalArgumentException::class.java) { outbox.enqueue("../record") }
         outbox.enqueue("record-1")
+        assertEquals(listOf("record-1"), outbox.pending())
+    }
+
+    @Test fun `completion write failure is recoverable and preserves pending intent`() {
+        val blocked = File(dir, "record-1.pending").apply { mkdir() }
+        File(blocked, "busy").writeText("busy")
+        val outbox = RevocationOutbox(dir)
+        assertThrows(IOException::class.java) { outbox.complete("record-1") }
         assertEquals(listOf("record-1"), outbox.pending())
     }
 }

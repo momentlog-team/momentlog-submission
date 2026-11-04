@@ -2,6 +2,7 @@ package team.momentlog.app.record
 
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,7 +28,7 @@ internal class RevocationOutbox(private val dir: File) {
 
     fun complete(id: String) = synchronized(lock) {
         val file = File(dir, "$id.pending")
-        check(!file.exists() || file.delete()) { "공유 철회 완료 상태를 저장하지 못했어요." }
+        if (file.exists() && !file.delete()) throw IOException("공유 철회 완료 상태를 저장하지 못했어요.")
     }
 
     fun reject(id: String) = synchronized(lock) {

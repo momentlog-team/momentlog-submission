@@ -33,6 +33,7 @@ import team.momentlog.app.config.theme.isSplit
 import team.momentlog.app.config.theme.q
 import team.momentlog.app.config.theme.textStyle
 import team.momentlog.app.ui.common.CustomButton
+import team.momentlog.app.ui.common.RecoveryPanel
 import team.momentlog.app.ui.models.Formats
 import team.momentlog.app.ui.screens.use_case.DocumentViewModel
 import team.momentlog.app.ui.screens.use_case.RecordViewModel
@@ -57,14 +58,25 @@ fun DocumentScreen(recordId: String, recordViewModel: RecordViewModel, documentV
     val share by documentViewModel.share.collectAsState()
     val failure by documentViewModel.failure.collectAsState()
     val current = record?.takeIf { it.id == recordId }
+    val loadedId by recordViewModel.loadedId.collectAsState()
+    val loadFailure by recordViewModel.recordFailure.collectAsState()
 
-    LaunchedEffect(current, online) {
+    // 봉인 상태만 갱신돼도 같은 요청을 취소/재시작하지 않는다.
+    LaunchedEffect(current?.id, current?.statement, current?.plate, online) {
         if (online) current?.let(documentViewModel::createDocument)
     }
 
     val colors = LocalAppColors.current
     val split = isSplit
     AppScreen(drivingAllowed = false) {
+        if (current == null) {
+            RecoveryPanel(
+                if (loadedId != recordId) "기록을 불러오고 있어요" else loadFailure ?: "기록이 삭제되었거나 보관 기간이 지났어요.",
+                "돌아가기", onBack, Modifier.align(Alignment.Center),
+                onRetry = if (loadedId == recordId) ({ recordViewModel.loadRecord(recordId) }) else null,
+            )
+            return@AppScreen
+        }
         val panelHeight = if (split) 560.q else null
         val qrState = when {
             !online -> QrState.OFFLINE
@@ -115,7 +127,7 @@ fun DocumentScreen(recordId: String, recordViewModel: RecordViewModel, documentV
             )
             Spacer(Modifier.height(16.q))
             Text(
-                if (qrState == QrState.OFFLINE && current != null) {
+                if (qrState == QrState.OFFLINE) {
                     "원본 시각은 저장 순간(${Formats.clock(current.triggeredAtMillis)})으로 고정되어 늦게 보내도 바뀌지 않아요"
                 } else {
                     "보험사·경찰에 블랙박스 영상과 함께 내세요"

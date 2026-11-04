@@ -10,6 +10,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.withLock
 import team.momentlog.app.record.RecordRemoteAccess
+import team.momentlog.app.record.DeviceIdentity
+import team.momentlog.app.record.SealClient
+import team.momentlog.app.BuildConfig
 import team.momentlog.app.Constant
 import team.momentlog.app.core.data.api.ApiInfo
 import team.momentlog.app.core.data.api.RecordApi
@@ -31,6 +34,9 @@ class RecordRepository(context: Context) {
 
     val changes = RecordStore.changes
     private val store = RecordStore(context)
+    private val sealClient by lazy {
+        SealClient(BuildConfig.SEAL_SERVER, DeviceIdentity.get(context.applicationContext), DeviceIdentity.token(context.applicationContext))
+    }
     private val api: RecordApi by lazy { ApiInfo.create(RecordApi::class.java) }
     /** 저장된 기록 목록. 최근 것부터. 보관 기간이 지난 기록은 먼저 지운다. */
     suspend fun getRecords(): List<RecordStore.Saved> = withContext(Dispatchers.IO) {
@@ -62,6 +68,18 @@ class RecordRepository(context: Context) {
             try {
                 val saved = getRecord(recordId)
                     ?: return@withContext Either.Left(Failure(message = "기록을 찾을 수 없어요."))
+                // 새 기록 직후 QR을 열어도 서버 봉인보다 공유 생성이 먼저 호출되지 않게 한다.
+                if (!saved.sealed) {
+                    if (saved.sealRejected) return@withContext Either.Left(Failure(message = "원본 봉인이 거부되어 공유할 수 없어요. 기기 인증과 기록을 확인해 주세요."))
+                    when (sealClient.seal(recordId, saved.sha256, saved.record.triggerAtMillis)) {
+                        SealClient.Result.SEALED -> store.markSealed(recordId)
+                        SealClient.Result.RETRY -> return@withContext Either.Left(Failure(message = "원본 봉인 대기 중이에요. 연결을 확인한 뒤 다시 받아 주세요."))
+                        SealClient.Result.REJECTED -> {
+                            store.markSealRejected(recordId)
+                            return@withContext Either.Left(Failure(message = "원본 봉인이 거부되어 공유할 수 없어요. 기기 인증과 기록을 확인해 주세요."))
+                        }
+                    }
+                }
                 val statement = if (saved.statement.isNullOrBlank() && saved.plate.isNullOrBlank()) null else
                     JSONObject().put("text", saved.statement ?: "")
                         .put("plate", saved.plate ?: JSONObject.NULL).toString()
