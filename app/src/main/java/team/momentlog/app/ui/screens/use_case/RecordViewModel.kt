@@ -74,5 +74,16 @@ class RecordViewModel(application: Application) : BaseViewModel(application) {
         }
     }
 
-    // TODO(앱): 삭제
+    fun delete(recordId: String, onDeleted: () -> Unit) {
+        viewModelScope.launch {
+            try {
+                recordRepository.delete(recordId)
+                if (_selected.value?.id == recordId) _selected.value = null
+                loadRecords()
+                onDeleted()
+            } catch (error: java.io.IOException) {
+                _failure.value = team.momentlog.app.core.error.Failure(message = "기록을 삭제하지 못했어요. 다시 시도해 주세요.")
+            }
+        }
+    }
 }

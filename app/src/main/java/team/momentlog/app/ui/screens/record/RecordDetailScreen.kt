@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -93,6 +95,15 @@ fun RecordDetailScreen(
     LaunchedEffect(recordId) { recordViewModel.loadRecord(recordId) }
     val record by recordViewModel.selected.collectAsState()
     val current = record?.takeIf { it.id == recordId }
+    var confirmDelete by remember(recordId) { mutableStateOf(false) }
+    val failure by recordViewModel.failure.collectAsState()
+    if (confirmDelete) AlertDialog(
+        onDismissRequest = { confirmDelete = false },
+        title = { Text("기록을 삭제할까요?") },
+        text = { Text(failure?.message ?: "차 안의 기록과 진술을 삭제하고 공유 링크도 닫아요. 오프라인이면 연결이 복구된 뒤 링크를 닫아요. 이미 받은 PDF는 회수되지 않아요.") },
+        confirmButton = { TextButton(onClick = { recordViewModel.delete(recordId) { confirmDelete = false; onOpenRecords() } }) { Text("삭제") } },
+        dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("취소") } },
+    )
 
     AppScreen(drivingAllowed = false) {
         if (current == null) {
@@ -113,13 +124,14 @@ fun RecordDetailScreen(
         val replay: () -> Unit = {
             if (finished) { replayKey++; playing = true } else playing = !playing
         }
-        if (isSplit) ResultSplit(current, onSendToPhone, onStatement, snapshot, playhead, replay, playing, finished)
-        else ResultFull(current, onSendToPhone, onOpenRecords, onStatement, snapshot, playhead, replay, playing, finished)
+        val onDelete = { recordViewModel.clearFailure(); confirmDelete = true }
+        if (isSplit) ResultSplit(current, onSendToPhone, onStatement, snapshot, playhead, replay, playing, finished, onDelete)
+        else ResultFull(current, onSendToPhone, onOpenRecords, onStatement, snapshot, playhead, replay, playing, finished, onDelete)
     }
 }
 
 @Composable
-private fun BoxScope.ResultFull(record: RecordInfo, onSendToPhone: () -> Unit, onOpenRecords: () -> Unit, onStatement: () -> Unit, snapshot: Snapshot?, playhead: Long, onReplay: () -> Unit, playing: Boolean, finished: Boolean) {
+private fun BoxScope.ResultFull(record: RecordInfo, onSendToPhone: () -> Unit, onOpenRecords: () -> Unit, onStatement: () -> Unit, snapshot: Snapshot?, playhead: Long, onReplay: () -> Unit, playing: Boolean, finished: Boolean, onDelete: () -> Unit) {
     val colors = LocalAppColors.current
     val tone = record.kind.tone(colors)
 
@@ -141,6 +153,7 @@ private fun BoxScope.ResultFull(record: RecordInfo, onSendToPhone: () -> Unit, o
     ) {
         StatusChip(chipText(record), tone, icon = record.kind.icon)
         Spacer(Modifier.weight(1f))
+        TextButton(onClick = onDelete) { Text("삭제", style = textStyle(24, 30, color = colors.textSecondary)) }
         CustomButton("휴대폰으로 받기", onSendToPhone, primary = true, large = false, icon = AppIcon.QR, compact = true)
         Spacer(Modifier.width(16.q))
         CustomButton("기록 목록", onOpenRecords, large = false, icon = AppIcon.LIST, compact = true)
@@ -174,13 +187,14 @@ private fun BoxScope.ResultFull(record: RecordInfo, onSendToPhone: () -> Unit, o
 }
 
 @Composable
-private fun ResultSplit(record: RecordInfo, onSendToPhone: () -> Unit, onStatement: () -> Unit, snapshot: Snapshot?, playhead: Long, onReplay: () -> Unit, playing: Boolean, finished: Boolean) {
+private fun ResultSplit(record: RecordInfo, onSendToPhone: () -> Unit, onStatement: () -> Unit, snapshot: Snapshot?, playhead: Long, onReplay: () -> Unit, playing: Boolean, finished: Boolean, onDelete: () -> Unit) {
     val colors = LocalAppColors.current
     val tone = record.kind.tone(colors)
     Box(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(start = 40.q, end = 40.q, top = 24.q), verticalAlignment = Alignment.CenterVertically) {
             StatusChip(chipText(record), tone, icon = record.kind.icon)
             Spacer(Modifier.weight(1f))
+            TextButton(onClick = onDelete) { Text("삭제", style = textStyle(24, 30, color = colors.textSecondary)) }
             CustomButton("받기", onSendToPhone, primary = true, large = false, icon = AppIcon.QR, compact = true)
         }
         Column(Modifier.padding(start = 40.q, end = 40.q, top = 144.q)) {

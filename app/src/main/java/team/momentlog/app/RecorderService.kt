@@ -67,7 +67,7 @@ class RecorderService : Service() {
     override fun onCreate() {
         super.onCreate()
         store = RecordStore(this)
-        sealQueue = SealRetryQueue(this, io).also { it.start() }
+        sealQueue = (application as MomentlogApplication).syncQueue
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -180,7 +180,6 @@ class RecorderService : Service() {
         handler.removeCallbacks(tick)
         acceleration.stop()
         source?.stop()
-        sealQueue.stop()
         io.cancel()
         _status.value = Status.STOPPED
         _live.value = null

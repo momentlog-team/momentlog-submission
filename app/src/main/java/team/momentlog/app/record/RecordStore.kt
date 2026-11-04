@@ -23,6 +23,7 @@ import java.io.File
  */
 class RecordStore(context: Context) {
     private val dir = File(context.filesDir, "records").apply { mkdirs() }
+    private val revocations = RevocationOutbox(File(context.filesDir, "share-revocations"))
 
     init {
         // 이전 Debug 버전이 자동 삽입한 예시 파일만 정리한다. 실제 기록은 UUID를 쓴다.
@@ -47,7 +48,7 @@ class RecordStore(context: Context) {
 
     fun markSealed(id: String) = update(id) { put("sealed", true) }
 
-    fun saveStatement(id: String, text: String, plate: String?, state: StatementState) = update(id) {
+    fun saveStatement(id: String, text: String, plate: String?, state: StatementState) = update(id, required = true) {
         put("statement", text)
         put("plate", plate ?: JSONObject.NULL)
         put("statementState", state.name)
@@ -58,19 +59,28 @@ class RecordStore(context: Context) {
     fun retain(id: String) = update(id) { put("retained", true) }
 
     /** 다른 기록에 합쳐진 앞선 기록을 지운다. 합친 기록이 그 구간과 감지를 그대로 담고 있다. */
-    fun delete(ids: List<String>) = synchronized(lock) { ids.forEach { AtomicFile(File(dir, "$it.json")).delete() } }
+    fun delete(ids: List<String>) = synchronized(lock) {
+        ids.forEach { id ->
+            revocations.enqueue(id)
+            AtomicFile(File(dir, "$id.json")).delete()
+        }
+        if (ids.isNotEmpty()) _changes.value += 1
+    }
 
     /** 보관 대상이 아닌데 보관 기간이 지난 기록을 지운다. */
     fun purgeExpired(nowMillis: Long) = synchronized(lock) {
         recordFiles().forEach { file ->
             val saved = load(JSONObject(AtomicFile(file).readFully().toString(Charsets.UTF_8)))
-            if (!saved.isKept && nowMillis >= saved.deleteAtMillis) AtomicFile(file).delete()
+            if (!saved.isKept && nowMillis >= saved.deleteAtMillis) delete(listOf(saved.record.id))
         }
     }
 
-    private fun update(id: String, change: JSONObject.() -> Unit) = synchronized(lock) {
+    private fun update(id: String, required: Boolean = false, change: JSONObject.() -> Unit) = synchronized(lock) {
         val file = File(dir, "$id.json")
-        if (!file.exists() && !File(dir, "$id.json.bak").exists()) return@synchronized
+        if (!file.exists() && !File(dir, "$id.json.bak").exists()) {
+            if (required) throw java.io.IOException("저장할 기록을 찾을 수 없어요.")
+            return@synchronized
+        }
         write(file, JSONObject(AtomicFile(file).readFully().toString(Charsets.UTF_8)).apply(change))
     }
 

@@ -4,6 +4,8 @@ import team.momentlog.app.core.data.model.record.DocumentRequest
 import team.momentlog.app.core.data.model.record.DocumentResponse
 import retrofit2.http.Body
 import retrofit2.http.POST
+import retrofit2.http.DELETE
+import retrofit2.http.Header
 import retrofit2.http.Path
 import team.momentlog.app.core.data.model.record.SealRequest
 import team.momentlog.app.core.data.model.record.SealResponse
@@ -14,7 +16,13 @@ import team.momentlog.app.core.data.model.record.VerifyResponse
 interface RecordApi {
 
     @POST("api/v1/records/{recordId}/seal")
-    suspend fun seal(@Path("recordId") recordId: String, @Body request: SealRequest): SealResponse
+    suspend fun seal(@Path("recordId") recordId: String, @Body request: SealRequest,
+                     @Header("X-Device-Token") deviceToken: String): SealResponse
+
+    @DELETE("api/v1/records/{recordId}/documents")
+    suspend fun revokeDocuments(@Path("recordId") recordId: String,
+                               @Header("X-Device-Id") deviceId: String,
+                               @Header("X-Device-Token") deviceToken: String)
 
     @POST("api/v1/records/{recordId}/verify")
     suspend fun verify(@Path("recordId") recordId: String, @Body request: VerifyRequest): VerifyResponse
