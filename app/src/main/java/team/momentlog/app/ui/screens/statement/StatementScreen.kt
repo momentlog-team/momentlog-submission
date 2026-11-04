@@ -41,7 +41,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
-import androidx.compose.material3.AlertDialog
+import team.momentlog.app.ui.common.AppConfirmDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -114,12 +114,12 @@ fun StatementScreen(
     BackHandler {
         if (step == Step.EDITING) statementViewModel.cancelEdit() else requestExit()
     }
-    if (confirmExit) AlertDialog(
-        onDismissRequest = { confirmExit = false },
-        title = { Text("진술 작성을 나갈까요?") },
-        text = { Text(if (voiceError != null) "저장하지 못한 내용이 있을 수 있어요. 나가면 해당 내용이 사라질 수 있어요." else "작성 중인 내용은 초안으로 보관해요. 기록 목록에서 이어서 작성할 수 있어요.") },
-        confirmButton = { TextButton(onClick = { confirmExit = false; statementViewModel.leaveScreen(recordId); onClose() }) { Text("나가기") } },
-        dismissButton = { TextButton(onClick = { confirmExit = false }) { Text("계속 작성") } },
+    if (confirmExit) AppConfirmDialog(
+        title = "진술 작성을 나갈까요?",
+        message = if (voiceError != null) "저장하지 못한 내용이 있을 수 있어요. 나가면 해당 내용이 사라질 수 있어요." else "작성 중인 내용은 초안으로 보관해요. 기록 목록에서 이어서 작성할 수 있어요.",
+        confirmLabel = "나가기", dismissLabel = "계속 작성",
+        onConfirm = { confirmExit = false; statementViewModel.leaveScreen(recordId); onClose() },
+        onDismiss = { confirmExit = false },
     )
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current

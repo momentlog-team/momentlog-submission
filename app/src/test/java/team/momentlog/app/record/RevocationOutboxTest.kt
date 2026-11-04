@@ -9,6 +9,18 @@ import org.junit.jupiter.api.Assertions.*
 class RevocationOutboxTest {
     @TempDir lateinit var dir: File
 
+    @Test fun `rejection cause survives restart and manual retry restores the same request`() {
+        val outbox = RevocationOutbox(dir)
+        outbox.enqueue("record-1")
+        outbox.reject("record-1", 403)
+        val restarted = RevocationOutbox(dir)
+        assertEquals(listOf(403), restarted.rejectedStatuses())
+        assertTrue(restarted.pending().isEmpty())
+        restarted.retryRejected()
+        assertEquals(listOf("record-1"), restarted.pending())
+        assertTrue(restarted.rejectedStatuses().isEmpty())
+    }
+
     @Test fun `deletion intent survives restart and duplicate requests`() {
         RevocationOutbox(dir).enqueue("record-1")
         val restarted = RevocationOutbox(dir)

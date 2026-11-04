@@ -71,7 +71,7 @@ fun AppNavHost(navController: NavHostController, viewModels: AppViewModels) {
             HomeScreen(viewModels.main, onOpenRecords = {
                 viewModels.record.resetListPosition()
                 toRecords()
-            })
+            }, onOpenSettings = { navController.navigate(Routes.SETTINGS) })
         }
         composable(Routes.RECORDS) {
             RecordListScreen(

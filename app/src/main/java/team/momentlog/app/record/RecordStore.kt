@@ -46,7 +46,7 @@ class RecordStore(context: Context) {
         write(File(dir, "${record.id}.json"), json)
     }
 
-    fun markSealed(id: String) = update(id) { put("sealed", true) }
+    fun markSealed(id: String) = update(id) { put("sealed", true); remove("sealRejected"); remove("sealFailureStatus") }
 
     fun saveStatement(id: String, text: String, plate: String?, state: StatementState) = update(id, required = true) {
         put("statement", text)
@@ -54,17 +54,29 @@ class RecordStore(context: Context) {
         put("statementState", state.name)
     }
 
-    fun markSealRejected(id: String) = update(id) { put("sealRejected", true) }
+    fun markSealRejected(id: String, status: Int? = null) = update(id) {
+        put("sealRejected", true)
+        put("sealFailureStatus", status ?: JSONObject.NULL)
+    }
+
+    fun retryRejectedSeals() = synchronized(lock) {
+        list().filter { !it.sealed && it.sealRejected }.forEach { saved ->
+            update(saved.record.id) { put("sealRejected", false); remove("sealFailureStatus") }
+        }
+    }
 
     fun retain(id: String) = update(id) { put("retained", true) }
 
     /** 다른 기록에 합쳐진 앞선 기록을 지운다. 합친 기록이 그 구간과 감지를 그대로 담고 있다. */
     fun delete(ids: List<String>) = synchronized(lock) {
+        var changed = false
         ids.forEach { id ->
             revocations.enqueue(id)
-            AtomicFile(File(dir, "$id.json")).delete()
+            val file = File(dir, "$id.json")
+            changed = changed || file.exists() || File(dir, "$id.json.bak").exists()
+            AtomicFile(file).delete()
         }
-        if (ids.isNotEmpty()) _changes.value += 1
+        if (changed) _changes.value += 1
     }
 
     /** 보관 대상이 아닌데 보관 기간이 지난 기록을 지운다. */
@@ -95,6 +107,7 @@ class RecordStore(context: Context) {
         val sha256: String,
         val sealed: Boolean,
         val sealRejected: Boolean = false,
+        val sealFailureStatus: Int? = null,
         val savedWhileParked: Boolean = false,
         val statement: String? = null,
         val plate: String? = null,
@@ -146,6 +159,7 @@ class RecordStore(context: Context) {
             sha256 = o.getString("sha256"),
             sealed = o.optBoolean("sealed", false),
             sealRejected = o.optBoolean("sealRejected", false),
+            sealFailureStatus = o.optNullable("sealFailureStatus") { getInt(it) },
             savedWhileParked = o.optBoolean("parked", false),
             statement = o.optNullable("statement") { getString(it) },
             plate = o.optNullable("plate") { getString(it) },

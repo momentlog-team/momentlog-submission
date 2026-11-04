@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -49,24 +50,28 @@ import team.momentlog.app.ui.screens.widget.label.StatusChip
 import team.momentlog.app.ui.screens.widget.label.VoiceHint
 import team.momentlog.app.ui.screens.widget.layout.AppScreen
 import team.momentlog.app.ui.screens.widget.motion.enterFromBelow
+import team.momentlog.app.record.SyncStatus
 
 /**
  * 대기 화면. 주행 중에도 보이는 화면이라 조작은 "지금 기록" 버튼 하나와 음성만 둔다.
  */
 @Composable
-fun HomeScreen(mainViewModel: MainViewModel, onOpenRecords: () -> Unit) {
+fun HomeScreen(mainViewModel: MainViewModel, onOpenRecords: () -> Unit, onOpenSettings: () -> Unit) {
     val isDriving by mainViewModel.isDriving.collectAsState()
     val unsupported by mainViewModel.unsupportedSignals.collectAsState()
+    val syncStatus by mainViewModel.syncStatus.collectAsState()
     HomeContent(
         parked = !isDriving,
         unsupported = unsupported,
         onRecordNow = mainViewModel::recordNow,
         onOpenRecords = onOpenRecords,
+        syncStatus = syncStatus,
+        onOpenSettings = onOpenSettings,
     )
 }
 
 @Composable
-private fun HomeContent(parked: Boolean, unsupported: List<String>, onRecordNow: () -> Unit, onOpenRecords: () -> Unit) {
+private fun HomeContent(parked: Boolean, unsupported: List<String>, onRecordNow: () -> Unit, onOpenRecords: () -> Unit, syncStatus: SyncStatus, onOpenSettings: () -> Unit) {
     val colors = LocalAppColors.current
     val split = isSplit
     val arrival = remember { Animatable(0f) }
@@ -134,6 +139,12 @@ private fun HomeContent(parked: Boolean, unsupported: List<String>, onRecordNow:
         }
 
         if (parked) {
+            if (syncStatus.needsAttention || syncStatus.pending > 0) StatusChip(
+                if (syncStatus.needsAttention) "서버 전송 확인 필요" else "서버 전송 대기",
+                if (syncStatus.needsAttention) colors.warning else colors.textSecondary,
+                Modifier.align(Alignment.TopStart).padding(start = if (split) 40.q else 56.q, top = 56.q).clickable(onClick = onOpenSettings),
+                icon = if (syncStatus.needsAttention) AppIcon.WARN else AppIcon.OFFLINE,
+            )
             CustomButton(
                 "내 기록", onOpenRecords,
                 Modifier.align(Alignment.TopEnd).padding(top = 44.q, end = if (split) 48.q else 56.q),

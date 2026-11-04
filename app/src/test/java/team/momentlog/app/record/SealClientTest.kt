@@ -7,6 +7,21 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class SealClientTest {
+    @Test fun `terminal response retains authentication and ownership status for user guidance`() {
+        MockWebServer().use { server ->
+            server.start()
+            val client = SealClient(server.url("/").toString().trimEnd('/'), "installation-1", "test-device-token")
+            for (status in listOf(401, 403, 409, 503)) {
+                server.enqueue(MockResponse().setResponseCode(status))
+                val seal = client.sealResponse("record-1", "a".repeat(64), 0)
+                assertEquals(status, seal.status)
+                assertEquals(if (status == 503) SealClient.Result.RETRY else SealClient.Result.REJECTED, seal.result)
+                server.enqueue(MockResponse().setResponseCode(status))
+                assertEquals(status, client.revokeResponse("record-1").status)
+            }
+        }
+    }
+
     @Test
     fun `revocation sends device authentication and retries only recoverable failures`() {
         MockWebServer().use { server ->

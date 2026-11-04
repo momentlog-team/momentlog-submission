@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -43,6 +44,7 @@ fun CustomButton(
     large: Boolean = true,
     icon: AppIcon? = null,
     compact: Boolean = false,
+    enabled: Boolean = true,
 ) {
     val colors = LocalAppColors.current
     val interaction = remember { MutableInteractionSource() }
@@ -53,11 +55,12 @@ fun CustomButton(
 
     Row(
         modifier
+            .alpha(if (enabled) 1f else 0.55f)
             .scale(scale)
             .height((if (compact) 80 else if (large) 100 else 80).q)
             .shadow(if (primary) 6.q else 3.q, shape, ambientColor = Color(0x2910151B), spotColor = Color(0x2910151B))
             .background(if (primary) colors.accent else colors.surface, shape)
-            .clickable(interaction, indication = null, onClick = onClick)
+            .clickable(interaction, indication = null, enabled = enabled, onClick = onClick)
             .padding(horizontal = (if (compact) 32 else if (large) 52 else 40).q),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,

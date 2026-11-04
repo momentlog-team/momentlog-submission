@@ -13,7 +13,9 @@ import java.time.Instant
  */
 class SealClient(private val baseUrl: String, private val deviceId: String, private val deviceToken: String) {
 
-    fun seal(recordId: String, sha256: String, createdAtMillis: Long): Result = runCatching {
+    fun seal(recordId: String, sha256: String, createdAtMillis: Long): Result = sealResponse(recordId, sha256, createdAtMillis).result
+
+    fun sealResponse(recordId: String, sha256: String, createdAtMillis: Long): Response = runCatching {
         val body = Gson().toJson(SealRequest(
             sha256 = sha256,
             formatVersion = RecordHasher.FORMAT_VERSION,
@@ -30,20 +32,24 @@ class SealClient(private val baseUrl: String, private val deviceId: String, priv
         }
         try {
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-            when (conn.responseCode) {
+            val status = conn.responseCode
+            Response(when (status) {
                 in 200..299 -> Result.SEALED
                 408, 429, in 500..599 -> Result.RETRY
                 else -> Result.REJECTED
-            }
+            }, status)
         } finally {
             conn.disconnect()
         }
-    }.getOrDefault(Result.RETRY)
+    }.getOrDefault(Response(Result.RETRY))
 
     enum class Result { SEALED, RETRY, REJECTED }
+    data class Response(val result: Result, val status: Int? = null)
 
     /** 404는 봉인이 없어 닫을 공유도 없는 경우다. 인증 실패는 재시도하지 않는다. */
-    fun revoke(recordId: String): Result = runCatching {
+    fun revoke(recordId: String): Result = revokeResponse(recordId).result
+
+    fun revokeResponse(recordId: String): Response = runCatching {
         val conn = (URL("$baseUrl/api/v1/records/$recordId/documents").openConnection() as HttpURLConnection).apply {
             requestMethod = "DELETE"
             connectTimeout = 5_000
@@ -52,11 +58,12 @@ class SealClient(private val baseUrl: String, private val deviceId: String, priv
             setRequestProperty("X-Device-Token", deviceToken)
         }
         try {
-            when (conn.responseCode) {
+            val status = conn.responseCode
+            Response(when (status) {
                 in 200..299, 404 -> Result.SEALED
                 408, 429, in 500..599 -> Result.RETRY
                 else -> Result.REJECTED
-            }
+            }, status)
         } finally { conn.disconnect() }
-    }.getOrDefault(Result.RETRY)
+    }.getOrDefault(Response(Result.RETRY))
 }

@@ -22,7 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
-import androidx.compose.material3.AlertDialog
+import team.momentlog.app.ui.common.AppConfirmDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -100,12 +100,12 @@ fun RecordDetailScreen(
     val loadFailure by recordViewModel.recordFailure.collectAsState()
     var confirmDelete by remember(recordId) { mutableStateOf(false) }
     val failure by recordViewModel.failure.collectAsState()
-    if (confirmDelete) AlertDialog(
-        onDismissRequest = { confirmDelete = false },
-        title = { Text("기록을 삭제할까요?") },
-        text = { Text(failure?.message ?: "차 안의 기록과 진술을 삭제하고 공유 링크도 닫아요. 오프라인이면 연결이 복구된 뒤 링크를 닫아요. 이미 받은 PDF는 회수되지 않아요.") },
-        confirmButton = { TextButton(onClick = { recordViewModel.delete(recordId) { confirmDelete = false; onOpenRecords() } }) { Text("삭제") } },
-        dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("취소") } },
+    if (confirmDelete) AppConfirmDialog(
+        title = "기록을 삭제할까요?",
+        message = failure?.message ?: "차 안의 기록과 진술을 삭제하고 공유 링크도 닫아요. 오프라인이면 연결이 돌아온 뒤 링크를 닫아요. 이미 받은 PDF는 회수되지 않아요.",
+        confirmLabel = "삭제", dismissLabel = "취소",
+        onConfirm = { recordViewModel.delete(recordId) { confirmDelete = false; onOpenRecords() } },
+        onDismiss = { confirmDelete = false },
     )
 
     AppScreen(drivingAllowed = false) {

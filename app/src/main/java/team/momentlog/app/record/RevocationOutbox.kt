@@ -31,9 +31,22 @@ internal class RevocationOutbox(private val dir: File) {
         if (file.exists() && !file.delete()) throw IOException("공유 철회 완료 상태를 저장하지 못했어요.")
     }
 
-    fun reject(id: String) = synchronized(lock) {
+    fun reject(id: String, status: Int? = null) = synchronized(lock) {
+        val pending = File(dir, "$id.pending")
+        FileOutputStream(pending).use { it.write((status?.toString() ?: "unknown").toByteArray()); it.fd.sync() }
         Files.move(File(dir, "$id.pending").toPath(), File(dir, "$id.rejected").toPath(), StandardCopyOption.REPLACE_EXISTING)
         Unit
+    }
+
+    fun rejectedStatuses(): List<Int?> = synchronized(lock) {
+        dir.listFiles().orEmpty().filter { it.extension == "rejected" }.map { it.readText().toIntOrNull() }
+    }
+
+    fun retryRejected() = synchronized(lock) {
+        dir.listFiles().orEmpty().filter { it.extension == "rejected" }.forEach {
+            Files.move(it.toPath(), File(dir, "${it.nameWithoutExtension}.pending").toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }
+        _changes.value += 1
     }
 
     companion object {

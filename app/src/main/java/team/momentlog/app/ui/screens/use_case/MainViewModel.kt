@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import team.momentlog.app.Constant
 import team.momentlog.app.RecorderService
+import team.momentlog.app.MomentlogApplication
 import team.momentlog.app.core.vehicle.DrivingStateMonitor
 import team.momentlog.core.Snapshot
 import java.util.Calendar
@@ -20,6 +21,9 @@ import java.util.Calendar
  * 앱 전체 상태: 주행 중인지, 기록 서비스 상태, 진행 중인 저장.
  */
 class MainViewModel(application: Application) : BaseViewModel(application) {
+    private val syncQueue = (application as MomentlogApplication).syncQueue
+    val syncStatus = syncQueue.status
+    fun retrySync() = syncQueue.retryFailures()
 
     private val drivingMonitor = DrivingStateMonitor(application).also { it.start() }
 

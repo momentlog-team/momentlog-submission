@@ -71,11 +71,12 @@ class RecordRepository(context: Context) {
                 // 새 기록 직후 QR을 열어도 서버 봉인보다 공유 생성이 먼저 호출되지 않게 한다.
                 if (!saved.sealed) {
                     if (saved.sealRejected) return@withContext Either.Left(Failure(message = "원본 봉인이 거부되어 공유할 수 없어요. 기기 인증과 기록을 확인해 주세요."))
-                    when (sealClient.seal(recordId, saved.sha256, saved.record.triggerAtMillis)) {
+                    val response = sealClient.sealResponse(recordId, saved.sha256, saved.record.triggerAtMillis)
+                    when (response.result) {
                         SealClient.Result.SEALED -> store.markSealed(recordId)
                         SealClient.Result.RETRY -> return@withContext Either.Left(Failure(message = "원본 봉인 대기 중이에요. 연결을 확인한 뒤 다시 받아 주세요."))
                         SealClient.Result.REJECTED -> {
-                            store.markSealRejected(recordId)
+                            store.markSealRejected(recordId, response.status)
                             return@withContext Either.Left(Failure(message = "원본 봉인이 거부되어 공유할 수 없어요. 기기 인증과 기록을 확인해 주세요."))
                         }
                     }
