@@ -201,6 +201,7 @@ fun StatementScreen(
         val actions: List<Triple<String, AppIcon?, () -> Unit>> = when (step) {
             Step.ASK -> listOf(
                 Triple("말하기", AppIcon.MIC, statementViewModel::speak),
+                Triple("직접 입력", null, statementViewModel::edit),
                 Triple("나중에", null, statementViewModel::later),
             )
             Step.LISTENING -> listOf(

@@ -7,6 +7,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import team.momentlog.app.voice.StatementVoice
 import team.momentlog.app.core.data.repository.RecordRepository
 import team.momentlog.app.record.RecordStore
@@ -23,8 +26,11 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
     private val recordRepository = RecordRepository(application)
     private var loadJob: Job? = null
     private var recordId: String? = null
+    private val persistenceMutex = Mutex()
+    private var dirty = false
     private val voice = StatementVoice(application)
     private var finishJob: Job? = null
+    private var saveJob: Job? = null
     private var promptedId: String? = null
     private val _session = MutableStateFlow(0)
     val session: StateFlow<Int> = _session
@@ -80,6 +86,7 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
         applyEdit()
         _voiceError.value = null
         _step.value = Step.CONFIRM
+        persistDraft()
     }
 
     fun cancelEdit() {
@@ -88,6 +95,7 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
     }
 
     private fun applyEdit() {
+        dirty = true
         _transcript.value = _editText.value.trim()
         _plate.value = _editPlate.value.trim().takeIf { it.isNotEmpty() }
     }
@@ -97,6 +105,7 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
         loadJob?.cancel()
         stopVoice()
         this.recordId = recordId
+        dirty = false
         _voiceError.value = null
         _step.value = Step.ASK
         clear()
@@ -130,6 +139,7 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
                     onFinal(it)
                     stopVoice()
                     _step.value = Step.CONFIRM
+                    persistDraft()
                 }
             },
             onLevel = { _level.value = it },
@@ -142,6 +152,7 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
         _voiceError.value = message
         if (_partial.value.isNotBlank()) onFinal(_partial.value)
         _step.value = if (_transcript.value.isBlank()) Step.ASK else Step.CONFIRM
+        persistDraft()
     }
 
     private fun stopVoice() {
@@ -155,15 +166,12 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
 
     fun leaveScreen() {
         stopVoice()
-        if (_step.value == Step.LISTENING || _step.value == Step.EDITING) {
+        if (_step.value in listOf(Step.LISTENING, Step.EDITING, Step.CONFIRM)) {
             if (_step.value == Step.EDITING) applyEdit()
             if (_partial.value.isNotBlank()) onFinal(_partial.value)
             val id = recordId
             val text = _transcript.value
-            val plate = _plate.value
-            if (id != null && text.isNotBlank()) viewModelScope.launch {
-                recordRepository.saveStatement(id, text, plate, RecordStore.StatementState.WRITING)
-            }
+            if (id != null && text.isNotBlank()) persistDraft()
             _step.value = if (_transcript.value.isBlank()) Step.ASK else Step.CONFIRM
         }
     }
@@ -173,6 +181,7 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
     }
 
     fun onFinal(text: String) {
+        dirty = true
         _transcript.value = listOf(_transcript.value, text).filter { it.isNotBlank() }.joinToString(" ")
         _partial.value = ""
         _plate.value = PLATE.find(_transcript.value)?.value ?: _plate.value
@@ -189,7 +198,7 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
                 if (_transcript.value.isBlank()) {
                     _voiceError.value = "받아 적은 내용이 없어요. 다시 말해 주세요."
                     _step.value = Step.ASK
-                } else _step.value = Step.CONFIRM
+                } else { _step.value = Step.CONFIRM; persistDraft() }
             }
         }
     }
@@ -197,11 +206,37 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
     fun restart() = speak()
 
     fun save(onSaved: () -> Unit) {
+        if (saveJob?.isActive == true) return
         val id = recordId ?: return
         if (_transcript.value.isBlank()) return
+        val text = _transcript.value
+        val plate = _plate.value
+        saveJob = viewModelScope.launch {
+            try {
+                writeStatement(id, text, plate, RecordStore.StatementState.DONE)
+                // 이후 화면 이탈에서 완료 상태를 초안으로 덮어쓰지 않는다.
+                if (recordId == id) {
+                    recordId = null
+                    onSaved()
+                }
+            } catch (error: CancellationException) { throw error }
+            catch (error: Exception) { _voiceError.value = "진술을 저장하지 못했어요. 다시 저장해 주세요." }
+        }
+    }
+
+    private suspend fun writeStatement(id: String, text: String, plate: String?, state: RecordStore.StatementState) {
+        persistenceMutex.withLock { recordRepository.saveStatement(id, text, plate, state) }
+    }
+
+    private fun persistDraft() {
+        val id = recordId ?: return
+        val text = _transcript.value
+        val plate = _plate.value
+        if (text.isBlank() || !dirty) return
         viewModelScope.launch {
-            recordRepository.saveStatement(id, _transcript.value, _plate.value, RecordStore.StatementState.DONE)
-            onSaved()
+            try { writeStatement(id, text, plate, RecordStore.StatementState.WRITING) }
+            catch (error: CancellationException) { throw error }
+            catch (error: Exception) { _voiceError.value = "받아 적은 내용을 저장하지 못했어요. 다시 저장해 주세요." }
         }
     }
 
@@ -210,8 +245,13 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
         val id = recordId ?: return
         stopVoice()
         _step.value = Step.LATER
+        val text = _transcript.value
+        val plate = _plate.value
         viewModelScope.launch {
-            recordRepository.saveStatement(id, "", null, RecordStore.StatementState.LATER)
+            try {
+                writeStatement(id, text, plate, if (text.isBlank()) RecordStore.StatementState.LATER else RecordStore.StatementState.WRITING)
+            } catch (error: CancellationException) { throw error }
+            catch (error: Exception) { _voiceError.value = "진술 상태를 저장하지 못했어요. 다시 시도해 주세요." }
         }
     }
 
@@ -225,7 +265,9 @@ class StatementViewModel(application: Application) : BaseViewModel(application) 
         val text = _transcript.value
         val plate = _plate.value
         viewModelScope.launch {
-            recordRepository.saveStatement(id, text, plate, RecordStore.StatementState.WRITING)
+            try { writeStatement(id, text, plate, RecordStore.StatementState.WRITING) }
+            catch (error: CancellationException) { throw error }
+            catch (error: Exception) { _voiceError.value = "진술 초안을 저장하지 못했어요." }
         }
         recordId = null
         _step.value = Step.ASK
