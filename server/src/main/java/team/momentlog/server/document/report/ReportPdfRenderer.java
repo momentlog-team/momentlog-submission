@@ -156,7 +156,7 @@ public class ReportPdfRenderer {
             float[] ratios = {1.15f, 1.25f, 0.9f, 1.1f};
             float sum = 4.4f;
             String[][] cells = {
-                    {"일시 (" + facts.record().getTrigger().getLabel() + " 감지 시각)", facts.time(), facts.date()},
+                    {"일시 (" + facts.record().getTrigger().getLabel() + " 시각)", facts.time(), facts.date()},
                     {"위치", placeText(), facts.coordText() == null ? "좌표 기록 없음" : facts.coordText()},
                     {"저장 구간", facts.windowText(), facts.windowSeconds() + "초"},
                     {"차량 상태", orNone(facts.lights()), "와이퍼 " + orNone(facts.wiper())},
@@ -196,7 +196,7 @@ public class ReportPdfRenderer {
             float gx = M + leftW + 10.5f;
             float gw = CW - leftW - 10.5f;
             strokeRoundRect(gx, top, gw, h, 7.5f, LINE);
-            text("시간축 그래프 · 0초 = " + facts.record().getTrigger().getLabel() + " 감지 (" + facts.time() + ")", f.bold(), 7.5f, TERTIARY, gx + 8, top + 14);
+            text("시간축 그래프 · 0초 = " + facts.record().getTrigger().getLabel() + " (" + facts.time() + ")", f.bold(), 7.5f, TERTIARY, gx + 8, top + 14);
             chart(gx + 8, top + 22, gw - 16, h - 44);
             float lx = gx + 8;
             for (String[] l : new String[][]{{"speed", "속도 km/h"}, {"brake", "브레이크"}, {"turn", "방향지시등"}, {"steer", "조향각 (가운데 = 정면)"}}) {
