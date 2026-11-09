@@ -224,4 +224,13 @@ class IncidentFlowTest {
         assertEquals(RecordHasher.sha256(record), RecordHasher.sha256(parsed))
         assertEquals(IncidentNarrator().narrate(record), IncidentNarrator().narrate(parsed))
     }
+
+    @Test
+    fun `음수 0은 0과 같은 원본이 된다(저장 후 다시 읽어도 해시가 같다)`() {
+        val base = IncidentRecord("z-1", Trigger.HARD_STOP, 40_000, intersectionScenario())
+        val negZero = base.copy(snapshots = base.snapshots.map { it.copy(steeringDeg = -0.0f, latitude = -0.0) })
+        val zero = base.copy(snapshots = base.snapshots.map { it.copy(steeringDeg = 0.0f, latitude = 0.0) })
+        assertEquals(RecordHasher.sha256(zero), RecordHasher.sha256(negZero))
+        assertTrue(!RecordHasher.canonical(negZero).contains("-0.0"))
+    }
 }
