@@ -94,6 +94,12 @@ object RecordHasher {
         )
     }
 
-    private fun num(v: Float?) = v?.let { String.format(Locale.ROOT, "%.2f", it) } ?: ""
-    private fun coord(v: Double?) = v?.let { String.format(Locale.ROOT, "%.6f", it) } ?: ""
+    private fun num(v: Float?) = v?.let { unsignedZero(String.format(Locale.ROOT, "%.2f", it)) } ?: ""
+    private fun coord(v: Double?) = v?.let { unsignedZero(String.format(Locale.ROOT, "%.6f", it)) } ?: ""
+
+    /**
+     * "-0.00"을 "0.00"으로. -0.0은 JSON에 저장했다 읽으면 0이 되므로, 그대로 두면 저장 전과 후의 해시가 달라진다
+     * (조향각 부호를 뒤집을 때 생겼던 문제, 11/9 시연 중 발견).
+     */
+    private fun unsignedZero(s: String) = if (s.startsWith("-") && s.all { it == '-' || it == '0' || it == '.' }) s.substring(1) else s
 }
