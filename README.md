@@ -1,18 +1,10 @@
-# 순간기록 (가칭)
+# momentlog
+
+팀 이름: **흔적**
 
 > 사고나 위험한 순간 직전 30초의 내 차 조작(속도·브레이크·방향지시등·핸들)을 사고 경위 문장으로 바꾸고, 정차 후 진술까지 묶어 바로 제출할 수 있는 사고 정리 문서로 만들어 주는 Pleos Connect 차량 앱
 
 현대자동차그룹 차량용 앱 개발 공모전(2026) 출품 준비 저장소입니다. **비공개 저장소**로 운영합니다.
-
-## 현재 상태 (초안)
-
-| 모듈 | 내용 | 상태 |
-|---|---|---|
-| `core/` | 30초 버퍼, 급정지 감지, 사고 기록, 경위 문장, 원본 해시 (순수 Kotlin) | 테스트 9건 통과 |
-| `server/` | 원본 해시 봉인·대조 API (Spring Boot 3.3.5, Java 17) | 테스트 4건 통과 |
-| `app/` | Pleos Vehicle SDK 연결, 포그라운드 서비스, 시연 재생, 기록 목록 화면 (Kotlin, Compose) | **작성만 됨, 첫 빌드 확인 필요** |
-
-`app/`은 Android SDK가 없는 PC에서 작성했습니다. Pleos SDK 메서드 이름·시그니처는 공개 소스(`Vehicle-2.3.2-sources.jar`)로 확인했지만, 실제 빌드와 에뮬레이터 실행은 아직 하지 않았습니다.
 
 ## 실행 방법
 
@@ -29,7 +21,7 @@
 1. Android Studio에서 루트 폴더를 연다. `local.properties`에 `sdk.dir`이 생기면 `:app` 모듈이 자동으로 포함된다(`settings.gradle.kts` 참고).
 2. Pleos 공식 가이드대로 Pleos Connect Emulator v2.1.0(API 34) AVD를 만든다.
 3. `./gradlew :app:assembleDebug` 후 설치.
-4. 런타임 권한 `android.car.permission.CAR_SPEED`를 허용한다(부여 방법은 첫 실행 때 확인해 이 문서에 적는다).
+4. 설치 시 `adb install -r -g`로 차량 속도 권한을 부여한다.
 5. 서버를 PC에서 띄우면 에뮬레이터 앱은 `http://10.0.2.2:8090`으로 접속한다(`app/build.gradle.kts`의 `SEAL_SERVER`).
 
 ### 시연
@@ -43,7 +35,7 @@
 | 에뮬레이터 | Pleos Connect Emulator v2.1.0, API 34, x86_64, RAM 4GB |
 | SDK | Vehicle 2.3.2, SpeechToText 3.3.1 (NaviHelper, FusedLocation은 미연결) |
 | JDK | 17 |
-| 빌드 | Gradle 8.14.3, AGP 8.8.2, Kotlin 2.0.21 |
+| 빌드 | Gradle 8.14.5, AGP 8.8.2, Kotlin 2.0.21 |
 
 ## 음성 진술
 
@@ -57,7 +49,15 @@
 
 ## APK
 
-제출 규칙: 저장소 루트 `apk/` 폴더에 `팀명_앱이름_release.apk` (실행 가능한 release). 아직 없음.
+제출 APK: [`apk/흔적_momentlog_release.apk`](apk/흔적_momentlog_release.apk) — 버전 0.1.0, 팀 전용 키로 서명한 release.
+
+현재 로컬 Pleos Connect Emulator v2.1.0 AVD: API 34, arm64-v8a, 화면 2560 × 1440 px, 160 dpi.
+
+설치: `adb install -r -g apk/흔적_momentlog_release.apk`. 기어 P에서 앱을 연다. 기존 debug 앱과 서명이 다르면 기존 앱을 삭제해야 하며, 이때 저장된 기록도 삭제되므로 먼저 보관한다.
+
+서버 봉인·QR·PDF는 PC 서버 실행이 필요하다. 기본 주소는 `http://10.0.2.2:8090`이다. 휴대폰 QR 사용 시 `app/build.gradle.kts`의 `DOCUMENT_BASE_URL`과 서버 `momentlog.public-base-url`을 휴대폰에서 접근할 수 있는 서버 주소로 설정한 뒤 다시 빌드한다.
+
+release 빌드는 JDK 17에서 `./gradlew :app:assembleRelease`로 수행한다. 현재 빌드 결과는 unsigned이므로 별도의 release 서명이 필요하다. 이번 APK의 키는 Git에서 제외된 `keystore/momentlog-release.jks`, 비밀번호는 `keystore.properties`에 보관한다. 두 파일은 안전한 곳에 별도로 백업하고 저장소에 업로드하지 않는다.
 
 ## 문서
 
@@ -77,5 +77,5 @@
 ## 제출 전 주의
 
 - 블라인드 심사: 저장소, README, 영상, APK 이름, 커밋 작성자에 실명·연락처가 나오면 안 된다. 제출 전에 팀 이름 Organization으로 저장소를 옮긴다.
-- 비공개 저장소로 제출하면 공지된 심사용 GitHub 계정을 Collaborator로 초대하고 마감 전에 접근을 확인한다.
+- 접수 메일에 저장소 주소와 최종 커밋 해시를 적는다. 비공개 저장소도 제출 가능하며 심사용 Collaborator 초대는 필요 없다. 11월 16일까지 Public으로 전환하고 11월 23일까지 공개 상태를 유지한다.
 - 코드와 자료는 Pleos·Android 공식 문서, 공식 샘플, 공개 SDK 소스만 참고한다. 다른 참가작의 코드·자료는 보지도 가져오지도 않는다(표절 시 수상 취소).
