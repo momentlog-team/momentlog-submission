@@ -34,7 +34,9 @@ class ReplaySource : SignalSource {
             s.turn = if (toCrash <= 6_200 && toCrash > -3_000) TurnSignal.RIGHT else TurnSignal.OFF
             s.brake = toCrash <= 4_100
             s.steeringDeg = 0f
+            // 재생 장면은 낮 시간. 실제 신호(Virtual Console)에 남은 전조등 값이 섞이지 않게 모두 정한다.
             s.lowBeam = false
+            s.highBeam = false
             s.wiperOn = false
             if (t < CRASH_AT_MS + 15_000) handler.postDelayed(this, 50)
         }
